@@ -12,6 +12,34 @@ datasource db {
   provider = "sqlite"
 }
 
+/// A person who can log in. Candidate records are separate — this is staff only.
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  /// scrypt hash as "salt:derivedKey". Never store or log the raw password.
+  passwordHash String
+  role         String   @default("recruiter") // admin | recruiter
+  createdAt    DateTime @default(now())
+
+  sessions Session[]
+}
+
+/// Server-side sessions, so a login can be revoked immediately by deleting the
+/// row. A self-contained signed cookie could not be revoked before it expired.
+model Session {
+  id        String   @id @default(cuid())
+  /// Random opaque token; this value is what the cookie carries.
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
 model Job {
   id        String   @id @default(cuid())
   title     String

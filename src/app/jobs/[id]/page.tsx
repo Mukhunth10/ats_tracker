@@ -7,10 +7,14 @@ import { Card, SectionTitle, SkillChip, STAGES } from "@/components/ui";
 import { CandidateFilter, type FilterRow } from "@/components/candidate-filter";
 import { UploadResume } from "@/components/upload-resume";
 import { KeywordEditor } from "@/components/keyword-editor";
+import { requirePageUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function JobPage(props: PageProps<"/jobs/[id]">) {
+  // Page-level guard: never rely on the route guard alone.
+  await requirePageUser();
+
   const { id } = await props.params;
 
   const job = await prisma.job.findUnique({

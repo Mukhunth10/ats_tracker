@@ -5,6 +5,7 @@ import { prisma, parseJson } from "@/lib/db";
 import { extractText, extractContact } from "@/lib/resume-parse";
 import { scoreByRules, type JobCriteria } from "@/lib/score-rules";
 import { scoreByAi, isAiConfigured } from "@/lib/score-ai";
+import { requireUser } from "@/lib/auth";
 
 /** Unpacks a Job row's JSON columns into the shape the scorer expects. */
 function criteriaFor(job: {
@@ -32,10 +33,12 @@ function parseKeywordList(raw: string): string[] {
 }
 
 /**
- * NOTE ON AUTH: these Server Actions are reachable by direct POST, not only
- * through the UI. This build has no authentication layer — before putting it
- * in front of real candidate data, add an auth check at the top of every
- * action here and every route under src/app/api.
+ * AUTH: every action below starts with `await requireUser()`.
+ *
+ * Server Actions are reachable by direct POST, not only through the UI, so the
+ * redirect in proxy.ts is not a security boundary — it only saves a human a
+ * wasted page load. requireUser() throws when there is no valid session, so an
+ * action that forgets the call fails closed rather than leaking data.
  */
 
 export type ActionState = { error?: string; ok?: string };
@@ -44,6 +47,7 @@ const STAGES = ["applied", "screening", "interview", "offer", "hired", "rejected
 export type Stage = (typeof STAGES)[number];
 
 export async function moveStage(applicationId: string, stage: string) {
+  await requireUser();
   if (!STAGES.includes(stage as Stage)) return;
 
   const app = await prisma.application.update({
@@ -61,10 +65,13 @@ export async function addNote(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  const user = await requireUser();
+
   const body = String(formData.get("body") ?? "").trim();
   if (!body) return { error: "Note cannot be empty." };
 
-  await prisma.note.create({ data: { applicationId, body } });
+  // Attribute the note to whoever is signed in, rather than a generic label.
+  await prisma.note.create({ data: { applicationId, body, author: user.name } });
   revalidatePath(`/applications/${applicationId}`);
   return { ok: "Note added." };
 }
@@ -74,6 +81,8 @@ export async function screenWithAi(
   applicationId: string,
   _prev: ActionState,
 ): Promise<ActionState> {
+  await requireUser();
+
   if (!isAiConfigured()) {
     return { error: "ANTHROPIC_API_KEY is not set. Add it to .env and restart the dev server." };
   }
@@ -128,6 +137,8 @@ export async function uploadResume(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  await requireUser();
+
   const files = formData.getAll("resume").filter((f): f is File => f instanceof File && f.size > 0);
   if (files.length === 0) {
     return { error: "Choose at least one CV (PDF, DOCX, TXT or MD)." };
@@ -243,6 +254,8 @@ export async function uploadResume(
  * the old criteria and the ranking silently lies.
  */
 export async function rescoreJob(jobId: string, _prev: ActionState): Promise<ActionState> {
+  await requireUser();
+
   const job = await prisma.job.findUnique({
     where: { id: jobId },
     include: { applications: { include: { candidate: true } } },
@@ -269,6 +282,8 @@ export async function updateJobKeywords(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  await requireUser();
+
   await prisma.job.update({
     where: { id: jobId },
     data: {
@@ -287,6 +302,8 @@ export async function updateJobKeywords(
 
 /** Create a role from the new-role form. */
 export async function createJob(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireUser();
+
   const title = String(formData.get("title") ?? "").trim();
   if (!title) return { error: "Title is required." };
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma, parseJson } from "@/lib/db";
 import { extractText, extractContact } from "@/lib/resume-parse";
 import { scoreByRules } from "@/lib/score-rules";
+import { denyAnonymous } from "@/lib/api-auth";
 
 export const runtime = "nodejs"; // pdf-parse and mammoth need Node APIs
 
@@ -12,6 +13,9 @@ export const runtime = "nodejs"; // pdf-parse and mammoth need Node APIs
  * rate limit never blocks a candidate from entering the pipeline.
  */
 export async function POST(req: Request) {
+  const denied = await denyAnonymous();
+  if (denied) return denied;
+
   const form = await req.formData();
   const jobId = form.get("jobId");
   const file = form.get("resume");

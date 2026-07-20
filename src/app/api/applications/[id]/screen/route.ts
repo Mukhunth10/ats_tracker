@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { prisma, parseJson } from "@/lib/db";
 import { scoreByAi, isAiConfigured } from "@/lib/score-ai";
+import { denyAnonymous } from "@/lib/api-auth";
 
 export const runtime = "nodejs";
 export const maxDuration = 120; // Opus at high effort can take a while on a long resume
 
 /** Runs Claude screening for one application and persists the verdict. */
 export async function POST(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const denied = await denyAnonymous();
+  if (denied) return denied;
+
   const { id } = await ctx.params;
 
   if (!isAiConfigured()) {

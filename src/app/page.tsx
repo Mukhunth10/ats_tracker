@@ -2,12 +2,16 @@ import Link from "next/link";
 import { prisma, parseJson } from "@/lib/db";
 import { Card, ScoreBadge, SectionTitle, SkillChip } from "@/components/ui";
 import { NewRoleForm } from "@/components/new-role-form";
+import { requirePageUser } from "@/lib/auth";
 
 // Recruiters expect the pipeline to reflect the database right now. Without
 // this, Next.js 16 prerenders the page at build time and serves stale counts.
 export const dynamic = "force-dynamic";
 
 export default async function RolesPage() {
+  // Page-level guard: never rely on the route guard alone.
+  await requirePageUser();
+
   const jobs = await prisma.job.findMany({
     orderBy: { createdAt: "desc" },
     include: {

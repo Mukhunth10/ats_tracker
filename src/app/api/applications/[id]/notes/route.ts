@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { denyAnonymous } from "@/lib/api-auth";
 
 const NoteInput = z.object({
   body: z.string().min(1).max(5000),
@@ -8,6 +9,9 @@ const NoteInput = z.object({
 });
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const denied = await denyAnonymous();
+  if (denied) return denied;
+
   const { id } = await ctx.params;
   const parsed = NoteInput.safeParse(await req.json());
   if (!parsed.success) {

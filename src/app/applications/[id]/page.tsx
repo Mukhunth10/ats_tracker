@@ -8,6 +8,7 @@ import { Card, ScoreBadge, SectionTitle, SkillChip } from "@/components/ui";
 import { StageSelect } from "@/components/stage-select";
 import { ScreenButton } from "@/components/screen-button";
 import { NoteForm } from "@/components/note-form";
+import { requirePageUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,9 @@ const RECOMMENDATION_STYLE: Record<string, string> = {
 };
 
 export default async function ApplicationPage(props: PageProps<"/applications/[id]">) {
+  // Page-level guard: never rely on the route guard alone.
+  await requirePageUser();
+
   const { id } = await props.params;
 
   const app = await prisma.application.findUnique({

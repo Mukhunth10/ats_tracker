@@ -122,18 +122,52 @@ both SQLite and Postgres. Switching takes three edits:
 
 Then `npx prisma migrate deploy`. Neon and Supabase both work on their free tiers.
 
+## Accounts and sign-in
+
+Every page, API route and Server Action requires a login.
+
+Create a staff account:
+
+```bash
+npx tsx prisma/create-user.ts someone@company.com "Their Name"
+```
+
+A strong password is generated and printed **once** — save it in a password
+manager. To set one yourself, pass it as a third argument. Re-running for an
+existing email resets that person's password and signs out their active
+sessions, which is also how you revoke access when someone leaves.
+
+How it is enforced, in three layers:
+
+| Layer | File | Purpose |
+| --- | --- | --- |
+| Route guard | `src/proxy.ts` | Redirects anonymous visitors to `/login` |
+| Page guard | `requirePageUser()` in each page | Redirects if the session is invalid |
+| Action/API guard | `requireUser()` / `denyAnonymous()` | The actual security boundary |
+
+The third layer is the one that matters. Server Actions are reachable by direct
+POST and API routes by direct `fetch`, so neither of the first two can be relied
+on alone — during development this app served the entire candidate list
+anonymously because the guard file sat in the wrong directory and silently never
+ran. Never add a page, action or route without its own check.
+
+Passwords are hashed with scrypt (Node standard library, no native dependency to
+compile) and compared in constant time. Sessions are rows in the database, so
+deleting one revokes a login immediately.
+
 ## Before this touches real candidate data
 
-This is a working foundation, not a finished product. Two things are genuinely
-missing and both matter legally:
-
-- **There is no authentication.** Every page and every API route is open, and
-  Server Actions are reachable by direct POST, not just through the UI. Add an
-  auth check at the top of every action in `src/app/actions.ts` and every route
-  under `src/app/api/` before exposing this beyond localhost.
 - **Resumes are personal data.** Resume text is stored in full in the database.
-  With AI screening off, it never leaves your machine. Still add a retention and
-  deletion policy.
+  With AI screening off, it never leaves your machine. Add a retention and
+  deletion policy, and confirm this fits your obligations to candidates.
+- **The dev server binds to your network by default.** `npm run dev` prints a
+  `Network:` address, meaning anyone on the same WiFi can reach the login page.
+  That is fine now that auth exists, but use `next dev -H 127.0.0.1` if you want
+  it strictly local.
+- **No HTTPS locally.** Session cookies are marked `secure` only in production.
+  Put this behind HTTPS before serving it beyond your own machine.
+- **No rate limiting on login.** Fine for a small internal tool on a trusted
+  network; add throttling before exposing it to the internet.
 
 Also worth knowing: **scores are advisory, not decisions.** The scorer reads
 words; it cannot tell that a candidate's "Revit API" work was two lines of

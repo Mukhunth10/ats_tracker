@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma, parseJson } from "@/lib/db";
 import { scoreByRules } from "@/lib/score-rules";
+import { denyAnonymous } from "@/lib/api-auth";
 
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const denied = await denyAnonymous();
+  if (denied) return denied;
+
   const { id } = await ctx.params;
 
   const job = await prisma.job.findUnique({
@@ -25,6 +29,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
 }
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const denied = await denyAnonymous();
+  if (denied) return denied;
+
   const { id } = await ctx.params;
   const body = await req.json();
 
@@ -74,6 +81,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 }
 
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const denied = await denyAnonymous();
+  if (denied) return denied;
+
   const { id } = await ctx.params;
   await prisma.job.delete({ where: { id } });
   return new NextResponse(null, { status: 204 });
