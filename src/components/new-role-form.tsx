@@ -1,0 +1,186 @@
+"use client";
+
+import { useActionState, useState } from "react";
+import { createJob, type ActionState } from "@/app/actions";
+import { SKILLS, CATEGORY_LABELS, type SkillCategory } from "@/lib/bim-taxonomy";
+
+const GROUPED = Object.entries(
+  SKILLS.reduce<Record<string, typeof SKILLS>>((acc, s) => {
+    (acc[s.category] ??= []).push(s);
+    return acc;
+  }, {}),
+) as [SkillCategory, typeof SKILLS][];
+
+const field =
+  "w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900";
+
+export function NewRoleForm() {
+  const [open, setOpen] = useState(false);
+  const [state, formAction, pending] = useActionState<ActionState, FormData>(createJob, {});
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700"
+      >
+        New role
+      </button>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-6">
+      <div className="w-full max-w-2xl rounded-lg bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+          <h2 className="font-semibold">New role</h2>
+          <button
+            onClick={() => setOpen(false)}
+            className="text-sm text-slate-500 hover:text-slate-900"
+          >
+            Close
+          </button>
+        </div>
+
+        <form action={formAction} className="space-y-4 px-6 py-5">
+          <div>
+            <label className="mb-1 block text-sm font-medium">Title</label>
+            <input
+              name="title"
+              required
+              placeholder="Senior Revit API Developer"
+              className={field}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium">Track</label>
+              <input name="track" placeholder="Revit API / C#" className={field} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Location</label>
+              <input name="location" placeholder="Chennai (Hybrid)" className={field} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Seniority</label>
+              <select name="seniority" defaultValue="mid" className={field}>
+                <option value="junior">Junior</option>
+                <option value="mid">Mid</option>
+                <option value="senior">Senior</option>
+                <option value="lead">Lead</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Minimum years</label>
+              <input
+                name="minYears"
+                type="number"
+                min={0}
+                max={40}
+                defaultValue={3}
+                className={field}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium">Description</label>
+            <textarea
+              name="description"
+              rows={3}
+              placeholder="What this person will actually build."
+              className={field}
+            />
+          </div>
+
+          <div className="rounded-md border border-slate-200 p-3">
+            <p className="mb-1 text-sm font-medium">Your own keywords</p>
+            <p className="mb-3 text-xs text-slate-500">
+              Type anything — one per line. Works for any construction role, not just
+              BIM. Use <code className="rounded bg-slate-100 px-1">|</code> to list
+              alternative spellings, e.g.{" "}
+              <code className="rounded bg-slate-100 px-1">Primavera P6 | P6</code>
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-emerald-700">
+                  Must have
+                </label>
+                <textarea
+                  name="customMustHave"
+                  rows={5}
+                  placeholder={"Primavera P6 | P6\nquantity takeoff\nRCC detailing"}
+                  className={`${field} font-mono text-xs`}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-600">
+                  Nice to have
+                </label>
+                <textarea
+                  name="customNiceToHave"
+                  rows={5}
+                  placeholder={"NEBOSH\nFIDIC\nSAP2000"}
+                  className={`${field} font-mono text-xs`}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-md border border-slate-200 p-3">
+            <p className="mb-1 text-sm font-medium">Built-in BIM library</p>
+            <p className="mb-3 text-xs text-slate-500">
+              Optional. Pre-weighted BIM/software skills — ignore this section entirely
+              for non-BIM roles.
+            </p>
+            <div className="max-h-64 space-y-3 overflow-y-auto pr-1">
+              {GROUPED.map(([category, skills]) => (
+                <div key={category}>
+                  <p className="mb-1.5 text-xs font-semibold tracking-wide text-slate-500 uppercase">
+                    {CATEGORY_LABELS[category]}
+                  </p>
+                  <div className="space-y-1">
+                    {skills.map((s) => (
+                      <div key={s.key} className="flex items-center gap-3 text-sm">
+                        <span className="flex-1 truncate">{s.label}</span>
+                        <label className="flex items-center gap-1 text-xs text-slate-600">
+                          <input type="checkbox" name="mustHave" value={s.key} />
+                          must
+                        </label>
+                        <label className="flex items-center gap-1 text-xs text-slate-600">
+                          <input type="checkbox" name="niceToHave" value={s.key} />
+                          nice
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {state.error && <p className="text-sm text-rose-600">{state.error}</p>}
+          {state.ok && <p className="text-sm text-emerald-600">{state.ok}</p>}
+
+          <div className="flex justify-end gap-2 border-t border-slate-200 pt-4">
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="rounded-md px-4 py-2 text-sm text-slate-600 hover:bg-slate-100"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={pending}
+              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+            >
+              {pending ? "Creating…" : "Create role"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}

@@ -1,65 +1,125 @@
-import Image from "next/image";
+import Link from "next/link";
+import { prisma, parseJson } from "@/lib/db";
+import { Card, ScoreBadge, SectionTitle, SkillChip } from "@/components/ui";
+import { NewRoleForm } from "@/components/new-role-form";
 
-export default function Home() {
+// Recruiters expect the pipeline to reflect the database right now. Without
+// this, Next.js 16 prerenders the page at build time and serves stale counts.
+export const dynamic = "force-dynamic";
+
+export default async function RolesPage() {
+  const jobs = await prisma.job.findMany({
+    orderBy: { createdAt: "desc" },
+    include: {
+      applications: {
+        select: { id: true, stage: true, ruleScore: true, aiScore: true },
+      },
+    },
+  });
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="space-y-8">
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Open roles</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            BIM software development pipelines, ranked by fit.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <NewRoleForm />
+      </div>
+
+      {jobs.length === 0 ? (
+        <Card className="p-12 text-center">
+          <p className="text-sm text-slate-500">
+            No roles yet. Create one to start tracking candidates.
+          </p>
+        </Card>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {jobs.map((job) => {
+            const mustHave = parseJson<string[]>(job.mustHave, []);
+            const active = job.applications.filter(
+              (a) => a.stage !== "rejected" && a.stage !== "hired",
+            );
+            // Surface the best available signal — AI where it has run, rules otherwise.
+            const best = job.applications.length
+              ? Math.max(...job.applications.map((a) => a.aiScore ?? a.ruleScore))
+              : null;
+            const screened = job.applications.filter((a) => a.aiScore !== null).length;
+
+            return (
+              <Link key={job.id} href={`/jobs/${job.id}`} className="group">
+                <Card className="h-full p-5 transition-shadow group-hover:shadow-md">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <h3 className="truncate font-semibold group-hover:text-slate-950">
+                        {job.title}
+                      </h3>
+                      <p className="mt-0.5 text-sm text-slate-500">
+                        {job.track} · {job.location}
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 capitalize">
+                      {job.seniority}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-1.5">
+                    {mustHave.slice(0, 4).map((k) => (
+                      <SkillChip key={k} skillKey={k} />
+                    ))}
+                    {mustHave.length > 4 && (
+                      <span className="px-1 py-0.5 text-xs text-slate-400">
+                        +{mustHave.length - 4}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-5 flex items-center gap-5 border-t border-slate-100 pt-4 text-sm">
+                    <div>
+                      <span className="font-semibold">{job.applications.length}</span>
+                      <span className="ml-1 text-slate-500">applicants</span>
+                    </div>
+                    <div>
+                      <span className="font-semibold">{active.length}</span>
+                      <span className="ml-1 text-slate-500">active</span>
+                    </div>
+                    <div>
+                      <span className="font-semibold">{screened}</span>
+                      <span className="ml-1 text-slate-500">AI screened</span>
+                    </div>
+                    {best !== null && (
+                      <div className="ml-auto">
+                        <ScoreBadge score={best} label="top" />
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              </Link>
+            );
+          })}
         </div>
-      </main>
+      )}
+
+      <div>
+        <SectionTitle>How scoring works</SectionTitle>
+        <Card className="p-5 text-sm leading-relaxed text-slate-600">
+          <p>
+            Scoring runs <strong className="text-slate-900">offline and free</strong>, with
+            no limit on how many CVs you process. Must-have skills are weighted by how
+            strongly they predict BIM development ability, then combined with
+            nice-to-haves and years of experience.
+          </p>
+          <p className="mt-3">
+            Crucially, a skill only counts fully when the CV{" "}
+            <strong className="text-slate-900">proves</strong> it. “Built a Revit API
+            add-in used by 400 modellers” earns full credit; “Revit API” sitting in a
+            keyword list earns half. That is what stops a CV written for the filter from
+            out-ranking a real developer.
+          </p>
+        </Card>
+      </div>
     </div>
   );
 }

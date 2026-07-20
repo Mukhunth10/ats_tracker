@@ -1,0 +1,314 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { prisma, parseJson } from "@/lib/db";
+import { extractText, extractContact } from "@/lib/resume-parse";
+import { scoreByRules, type JobCriteria } from "@/lib/score-rules";
+import { scoreByAi, isAiConfigured } from "@/lib/score-ai";
+
+/** Unpacks a Job row's JSON columns into the shape the scorer expects. */
+function criteriaFor(job: {
+  mustHave: string;
+  niceToHave: string;
+  customMustHave: string;
+  customNiceToHave: string;
+  minYears: number;
+}): JobCriteria {
+  return {
+    mustHave: parseJson<string[]>(job.mustHave, []),
+    niceToHave: parseJson<string[]>(job.niceToHave, []),
+    customMustHave: parseJson<string[]>(job.customMustHave, []),
+    customNiceToHave: parseJson<string[]>(job.customNiceToHave, []),
+    minYears: job.minYears,
+  };
+}
+
+/** Splits a textarea of keywords (one per line, or comma separated) into terms. */
+function parseKeywordList(raw: string): string[] {
+  return raw
+    .split(/[\n,]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/**
+ * NOTE ON AUTH: these Server Actions are reachable by direct POST, not only
+ * through the UI. This build has no authentication layer — before putting it
+ * in front of real candidate data, add an auth check at the top of every
+ * action here and every route under src/app/api.
+ */
+
+export type ActionState = { error?: string; ok?: string };
+
+const STAGES = ["applied", "screening", "interview", "offer", "hired", "rejected"] as const;
+export type Stage = (typeof STAGES)[number];
+
+export async function moveStage(applicationId: string, stage: string) {
+  if (!STAGES.includes(stage as Stage)) return;
+
+  const app = await prisma.application.update({
+    where: { id: applicationId },
+    data: { stage },
+    select: { jobId: true },
+  });
+
+  revalidatePath(`/jobs/${app.jobId}`);
+  revalidatePath(`/applications/${applicationId}`);
+}
+
+export async function addNote(
+  applicationId: string,
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const body = String(formData.get("body") ?? "").trim();
+  if (!body) return { error: "Note cannot be empty." };
+
+  await prisma.note.create({ data: { applicationId, body } });
+  revalidatePath(`/applications/${applicationId}`);
+  return { ok: "Note added." };
+}
+
+/** Runs Claude screening and stores the verdict. Surfaced as a button in the UI. */
+export async function screenWithAi(
+  applicationId: string,
+  _prev: ActionState,
+): Promise<ActionState> {
+  if (!isAiConfigured()) {
+    return { error: "ANTHROPIC_API_KEY is not set. Add it to .env and restart the dev server." };
+  }
+
+  const app = await prisma.application.findUnique({
+    where: { id: applicationId },
+    include: { candidate: true, job: true },
+  });
+  if (!app) return { error: "Application not found." };
+
+  try {
+    const result = await scoreByAi(app.candidate.resumeText, {
+      title: app.job.title,
+      track: app.job.track,
+      seniority: app.job.seniority,
+      minYears: app.job.minYears,
+      description: app.job.description,
+      mustHave: parseJson<string[]>(app.job.mustHave, []),
+      niceToHave: parseJson<string[]>(app.job.niceToHave, []),
+    });
+
+    await prisma.application.update({
+      where: { id: applicationId },
+      data: {
+        aiScore: result.score,
+        aiSummary: result.summary,
+        aiDetail: JSON.stringify(result),
+        aiScoredAt: new Date(),
+      },
+    });
+
+    revalidatePath(`/applications/${applicationId}`);
+    revalidatePath(`/jobs/${app.jobId}`);
+    return { ok: `Screened — ${result.score}/100 (${result.recommendation}).` };
+  } catch (err) {
+    console.error("AI screening failed", err);
+    return { error: err instanceof Error ? err.message : "Screening failed." };
+  }
+}
+
+/**
+ * Bulk resume intake. Accepts many files at once because applications arrive in
+ * batches from LinkedIn, Indeed, jobs.ie and the careers page — uploading them
+ * one at a time is not a real workflow.
+ *
+ * Each file is processed independently: one unreadable CV in a batch of fifty
+ * must not discard the other forty-nine, so failures are collected and
+ * reported rather than thrown.
+ */
+export async function uploadResume(
+  jobId: string,
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const files = formData.getAll("resume").filter((f): f is File => f instanceof File && f.size > 0);
+  if (files.length === 0) {
+    return { error: "Choose at least one CV (PDF, DOCX, TXT or MD)." };
+  }
+
+  const job = await prisma.job.findUnique({ where: { id: jobId } });
+  if (!job) return { error: "Job not found." };
+
+  const criteria = criteriaFor(job);
+  const source = String(formData.get("source") ?? "direct").trim() || "direct";
+
+  // Manual overrides only make sense for a single upload; with a batch we rely
+  // entirely on what each CV contains.
+  const single = files.length === 1;
+  const overrideEmail = single ? String(formData.get("email") ?? "").trim() : "";
+  const overrideName = single ? String(formData.get("name") ?? "").trim() : "";
+
+  const added: string[] = [];
+  const updated: string[] = [];
+  const failed: string[] = [];
+
+  for (const file of files) {
+    try {
+      const text = await extractText(Buffer.from(await file.arrayBuffer()), file.name);
+
+      if (text.trim().length < 100) {
+        failed.push(`${file.name}: no readable text (scanned image?)`);
+        continue;
+      }
+
+      const contact = extractContact(text);
+      const email = overrideEmail || contact.email;
+      const name = overrideName || contact.name;
+
+      if (!email) {
+        failed.push(`${file.name}: no email address found`);
+        continue;
+      }
+
+      // Email is the identity key, so the same person applying via LinkedIn and
+      // Indeed lands on one record instead of two.
+      const existing = await prisma.candidate.findUnique({ where: { email } });
+      const candidate = await prisma.candidate.upsert({
+        where: { email },
+        update: { resumeText: text, resumeFile: file.name, ...(name ? { name } : {}) },
+        create: {
+          name: name ?? email,
+          email,
+          phone: contact.phone,
+          resumeText: text,
+          resumeFile: file.name,
+        },
+      });
+
+      const rules = scoreByRules(text, criteria);
+
+      const priorApplication = await prisma.application.findUnique({
+        where: { jobId_candidateId: { jobId, candidateId: candidate.id } },
+      });
+
+      await prisma.application.upsert({
+        where: { jobId_candidateId: { jobId, candidateId: candidate.id } },
+        update: {
+          ruleScore: rules.score,
+          ruleDetail: JSON.stringify(rules.detail),
+          // Record every portal a duplicate arrived through, rather than
+          // overwriting — knowing someone applied twice is useful signal.
+          // Split-and-check so re-uploading from the same portal doesn't
+          // accumulate "LinkedIn, LinkedIn, LinkedIn".
+          source:
+            priorApplication &&
+            !priorApplication.source.split(",").map((s) => s.trim()).includes(source)
+              ? `${priorApplication.source}, ${source}`
+              : (priorApplication?.source ?? source),
+        },
+        create: {
+          jobId,
+          candidateId: candidate.id,
+          source,
+          ruleScore: rules.score,
+          ruleDetail: JSON.stringify(rules.detail),
+        },
+      });
+
+      if (priorApplication || existing) {
+        updated.push(`${candidate.name} (${rules.score})`);
+      } else {
+        added.push(`${candidate.name} (${rules.score})`);
+      }
+    } catch (err) {
+      failed.push(`${file.name}: ${err instanceof Error ? err.message : "unreadable"}`);
+    }
+  }
+
+  revalidatePath(`/jobs/${jobId}`);
+
+  const parts: string[] = [];
+  if (added.length) parts.push(`${added.length} added`);
+  if (updated.length) parts.push(`${updated.length} already known, refreshed`);
+
+  if (parts.length === 0) {
+    return { error: `Nothing imported. ${failed.join("; ")}` };
+  }
+
+  return {
+    ok: `${parts.join(", ")}.${failed.length ? ` ${failed.length} failed: ${failed.join("; ")}` : ""}`,
+  };
+}
+
+/**
+ * Re-runs scoring for every candidate on a role. Needed whenever the role's
+ * keywords change — otherwise existing applicants keep scores computed against
+ * the old criteria and the ranking silently lies.
+ */
+export async function rescoreJob(jobId: string, _prev: ActionState): Promise<ActionState> {
+  const job = await prisma.job.findUnique({
+    where: { id: jobId },
+    include: { applications: { include: { candidate: true } } },
+  });
+  if (!job) return { error: "Job not found." };
+
+  const criteria = criteriaFor(job);
+
+  for (const app of job.applications) {
+    const rules = scoreByRules(app.candidate.resumeText, criteria);
+    await prisma.application.update({
+      where: { id: app.id },
+      data: { ruleScore: rules.score, ruleDetail: JSON.stringify(rules.detail) },
+    });
+  }
+
+  revalidatePath(`/jobs/${jobId}`);
+  return { ok: `Rescored ${job.applications.length} candidates.` };
+}
+
+/** Update a role's keywords, then rescore everyone against the new criteria. */
+export async function updateJobKeywords(
+  jobId: string,
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await prisma.job.update({
+    where: { id: jobId },
+    data: {
+      customMustHave: JSON.stringify(
+        parseKeywordList(String(formData.get("customMustHave") ?? "")),
+      ),
+      customNiceToHave: JSON.stringify(
+        parseKeywordList(String(formData.get("customNiceToHave") ?? "")),
+      ),
+      minYears: Number(formData.get("minYears") ?? 0) || 0,
+    },
+  });
+
+  return rescoreJob(jobId, {});
+}
+
+/** Create a role from the new-role form. */
+export async function createJob(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const title = String(formData.get("title") ?? "").trim();
+  if (!title) return { error: "Title is required." };
+
+  const job = await prisma.job.create({
+    data: {
+      title,
+      track: String(formData.get("track") ?? "General"),
+      location: String(formData.get("location") ?? "Unspecified"),
+      seniority: String(formData.get("seniority") ?? "mid"),
+      minYears: Number(formData.get("minYears") ?? 0) || 0,
+      description: String(formData.get("description") ?? ""),
+      mustHave: JSON.stringify(formData.getAll("mustHave").map(String)),
+      niceToHave: JSON.stringify(formData.getAll("niceToHave").map(String)),
+      customMustHave: JSON.stringify(
+        parseKeywordList(String(formData.get("customMustHave") ?? "")),
+      ),
+      customNiceToHave: JSON.stringify(
+        parseKeywordList(String(formData.get("customNiceToHave") ?? "")),
+      ),
+    },
+  });
+
+  revalidatePath("/");
+  return { ok: `Created “${job.title}”.` };
+}
