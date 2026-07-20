@@ -19,13 +19,13 @@ export function NoteForm({ applicationId }: { applicationId: string }) {
         name="body"
         rows={3}
         placeholder="Screening notes, interview feedback, follow-ups…"
-        className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
+        className="w-full rounded-md border border-line-strong px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary"
       />
-      {state.error && <p className="text-sm text-rose-600">{state.error}</p>}
+      {state.error && <p className="text-sm text-danger">{state.error}</p>}
       <button
         type="submit"
         disabled={pending}
-        className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
+        className="rounded-md border border-line-strong px-3 py-1.5 text-sm font-medium hover:bg-surface-2 disabled:opacity-50"
       >
         {pending ? "Saving…" : "Add note"}
       </button>

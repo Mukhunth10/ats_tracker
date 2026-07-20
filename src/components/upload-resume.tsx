@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import { uploadResume, type ActionState } from "@/app/actions";
 
 const field =
-  "w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900";
+  "w-full rounded-md border border-line-strong px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary";
 
 /** Common intake channels. Free text, so an unlisted portal still works. */
 const SOURCES = [
@@ -35,9 +35,9 @@ export function UploadResume({ jobId }: { jobId: string }) {
           multiple
           required
           onChange={(e) => setCount(e.target.files?.length ?? 0)}
-          className="w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-slate-700"
+          className="w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-sm file:font-medium file:text-primary-fg hover:file:bg-primary-hover"
         />
-        <p className="mt-1.5 text-xs text-slate-500">
+        <p className="mt-1.5 text-xs text-ink-muted">
           Select many at once. PDF, DOCX, TXT or MD. Scanned image PDFs will not parse.
         </p>
       </div>
@@ -60,7 +60,7 @@ export function UploadResume({ jobId }: { jobId: string }) {
 
       {count <= 1 && (
         <details className="text-sm">
-          <summary className="cursor-pointer text-slate-600 hover:text-slate-900">
+          <summary className="cursor-pointer text-ink-muted hover:text-ink">
             Override parsed contact details
           </summary>
           <div className="mt-2 space-y-2">
@@ -70,13 +70,13 @@ export function UploadResume({ jobId }: { jobId: string }) {
         </details>
       )}
 
-      {state.error && <p className="text-sm text-rose-600">{state.error}</p>}
-      {state.ok && <p className="text-sm text-emerald-600">{state.ok}</p>}
+      {state.error && <p className="text-sm text-danger">{state.error}</p>}
+      {state.ok && <p className="text-sm text-success">{state.ok}</p>}
 
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+        className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-fg hover:bg-primary-hover disabled:opacity-50"
       >
         {pending
           ? `Parsing and scoring ${count || ""} CV${count === 1 ? "" : "s"}…`

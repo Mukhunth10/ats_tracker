@@ -9,22 +9,31 @@ export default async function LoginPage() {
   if (await getSessionUser()) redirect("/");
 
   return (
-    <div className="mx-auto flex min-h-[70vh] max-w-sm flex-col justify-center">
-      <div className="mb-8 text-center">
-        <span className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-lg bg-slate-900 text-lg font-bold text-white">
-          B
-        </span>
-        <h1 className="text-xl font-semibold tracking-tight">Sign in</h1>
-        <p className="mt-1 text-sm text-slate-500">Construction ATS</p>
-      </div>
+    <div className="mx-auto flex min-h-[75vh] max-w-sm flex-col justify-center">
+      <div className="rise">
+        <div className="mb-8 text-center">
+          <span
+            aria-hidden
+            className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-xl bg-primary text-lg font-bold text-primary-fg"
+          >
+            H
+          </span>
+          <h1 className="text-xl font-semibold tracking-tight">Sign in to Hirebase</h1>
+          <p className="mt-1.5 text-sm text-ink-muted">
+            Construction recruitment and CV screening
+          </p>
+        </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white p-6">
-        <LoginForm />
-      </div>
+        <div className="rounded-xl border border-line bg-surface p-6 shadow-card">
+          <LoginForm />
+        </div>
 
-      <p className="mt-6 text-center text-xs text-slate-400">
-        Candidate data is confidential. Do not share your login.
-      </p>
+        <p className="mt-6 text-center text-xs leading-relaxed text-ink-subtle">
+          Candidate records are confidential.
+          <br />
+          Do not share your login or leave this open on a shared machine.
+        </p>
+      </div>
     </div>
   );
 }

@@ -77,29 +77,29 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
   return (
     <div className="space-y-8">
       <div>
-        <Link href="/" className="text-sm text-slate-500 hover:text-slate-900">
+        <Link href="/" className="text-sm text-ink-muted hover:text-ink">
           ← All roles
         </Link>
         <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">{job.title}</h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-ink-muted">
               {job.track} · {job.location} · {job.seniority} · {job.minYears}+ years
             </p>
           </div>
-          <div className="text-right text-sm text-slate-500">
+          <div className="text-right text-sm text-ink-muted">
             {job.applications.length} applicants
           </div>
         </div>
         {job.description && (
-          <p className="mt-3 max-w-3xl text-sm leading-relaxed text-slate-600">
+          <p className="mt-3 max-w-3xl text-sm leading-relaxed text-ink-muted">
             {job.description}
           </p>
         )}
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
           {(mustHave.length > 0 || customMustHave.length > 0) && (
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-xs font-medium text-slate-500">Must have</span>
+              <span className="text-xs font-medium text-ink-muted">Must have</span>
               {mustHave.map((k) => (
                 <SkillChip key={k} skillKey={k} tone="good" />
               ))}
@@ -110,7 +110,7 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
           )}
           {(niceToHave.length > 0 || customNiceToHave.length > 0) && (
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-xs font-medium text-slate-500">Nice to have</span>
+              <span className="text-xs font-medium text-ink-muted">Nice to have</span>
               {niceToHave.map((k) => (
                 <SkillChip key={k} skillKey={k} />
               ))}
@@ -123,7 +123,7 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
       </div>
 
       {noCriteria && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        <div className="rounded-lg border border-warn-border bg-warn-soft p-4 text-sm text-warn">
           <strong>This role has no screening criteria.</strong> With nothing to match
           against, every candidate scores near 100 and the ranking is meaningless. Add
           keywords under <em>Screening criteria</em> to make the scores mean something.
@@ -135,7 +135,7 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
           <div>
             <SectionTitle>Ranked candidates</SectionTitle>
             {ranked.length === 0 ? (
-              <Card className="p-10 text-center text-sm text-slate-500">
+              <Card className="p-10 text-center text-sm text-ink-muted">
                 No candidates yet. Upload a resume to get started.
               </Card>
             ) : (
@@ -149,26 +149,26 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
               {byStage.map(({ stage, items }) => (
                 <Card key={stage} className="p-3">
                   <div className="mb-2 flex items-center justify-between">
-                    <span className="text-xs font-medium text-slate-600 capitalize">
+                    <span className="text-xs font-medium text-ink-muted capitalize">
                       {stage}
                     </span>
-                    <span className="text-xs text-slate-400">{items.length}</span>
+                    <span className="text-xs text-ink-subtle">{items.length}</span>
                   </div>
                   <div className="space-y-1.5">
                     {items.map((a) => (
                       <Link
                         key={a.id}
                         href={`/applications/${a.id}`}
-                        className="block truncate rounded bg-slate-50 px-2 py-1.5 text-xs hover:bg-slate-100"
+                        className="block truncate rounded bg-surface-2 px-2 py-1.5 text-xs hover:bg-surface-2"
                       >
                         {a.candidate.name}
-                        <span className="ml-1 text-slate-400">
+                        <span className="ml-1 text-ink-subtle">
                           {a.aiScore ?? a.ruleScore}
                         </span>
                       </Link>
                     ))}
                     {items.length === 0 && (
-                      <p className="px-2 py-1.5 text-xs text-slate-300">Empty</p>
+                      <p className="px-2 py-1.5 text-xs text-ink-subtle">Empty</p>
                     )}
                   </div>
                 </Card>

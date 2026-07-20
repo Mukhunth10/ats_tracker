@@ -12,7 +12,7 @@ const GROUPED = Object.entries(
 ) as [SkillCategory, typeof SKILLS][];
 
 const field =
-  "w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900";
+  "w-full rounded-md border border-line-strong px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary";
 
 export function NewRoleForm() {
   const [open, setOpen] = useState(false);
@@ -22,7 +22,7 @@ export function NewRoleForm() {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700"
+        className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-fg transition-colors hover:bg-primary-hover"
       >
         New role
       </button>
@@ -30,13 +30,13 @@ export function NewRoleForm() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/40 p-6">
-      <div className="w-full max-w-2xl rounded-lg bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[rgb(15_23_42_/_0.5)] p-6">
+      <div className="w-full max-w-2xl rounded-lg bg-surface shadow-xl">
+        <div className="flex items-center justify-between border-b border-line px-6 py-4">
           <h2 className="font-semibold">New role</h2>
           <button
             onClick={() => setOpen(false)}
-            className="text-sm text-slate-500 hover:text-slate-900"
+            className="text-sm text-ink-muted hover:text-ink"
           >
             Close
           </button>
@@ -94,17 +94,17 @@ export function NewRoleForm() {
             />
           </div>
 
-          <div className="rounded-md border border-slate-200 p-3">
+          <div className="rounded-md border border-line p-3">
             <p className="mb-1 text-sm font-medium">Your own keywords</p>
-            <p className="mb-3 text-xs text-slate-500">
+            <p className="mb-3 text-xs text-ink-muted">
               Type anything — one per line. Works for any construction role, not just
-              BIM. Use <code className="rounded bg-slate-100 px-1">|</code> to list
+              BIM. Use <code className="rounded bg-surface-2 px-1">|</code> to list
               alternative spellings, e.g.{" "}
-              <code className="rounded bg-slate-100 px-1">Primavera P6 | P6</code>
+              <code className="rounded bg-surface-2 px-1">Primavera P6 | P6</code>
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <label className="mb-1 block text-xs font-medium text-emerald-700">
+                <label className="mb-1 block text-xs font-medium text-success">
                   Must have
                 </label>
                 <textarea
@@ -115,7 +115,7 @@ export function NewRoleForm() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">
+                <label className="mb-1 block text-xs font-medium text-ink-muted">
                   Nice to have
                 </label>
                 <textarea
@@ -128,27 +128,27 @@ export function NewRoleForm() {
             </div>
           </div>
 
-          <div className="rounded-md border border-slate-200 p-3">
+          <div className="rounded-md border border-line p-3">
             <p className="mb-1 text-sm font-medium">Built-in BIM library</p>
-            <p className="mb-3 text-xs text-slate-500">
+            <p className="mb-3 text-xs text-ink-muted">
               Optional. Pre-weighted BIM/software skills — ignore this section entirely
               for non-BIM roles.
             </p>
             <div className="max-h-64 space-y-3 overflow-y-auto pr-1">
               {GROUPED.map(([category, skills]) => (
                 <div key={category}>
-                  <p className="mb-1.5 text-xs font-semibold tracking-wide text-slate-500 uppercase">
+                  <p className="mb-1.5 text-xs font-semibold tracking-wide text-ink-muted uppercase">
                     {CATEGORY_LABELS[category]}
                   </p>
                   <div className="space-y-1">
                     {skills.map((s) => (
                       <div key={s.key} className="flex items-center gap-3 text-sm">
                         <span className="flex-1 truncate">{s.label}</span>
-                        <label className="flex items-center gap-1 text-xs text-slate-600">
+                        <label className="flex items-center gap-1 text-xs text-ink-muted">
                           <input type="checkbox" name="mustHave" value={s.key} />
                           must
                         </label>
-                        <label className="flex items-center gap-1 text-xs text-slate-600">
+                        <label className="flex items-center gap-1 text-xs text-ink-muted">
                           <input type="checkbox" name="niceToHave" value={s.key} />
                           nice
                         </label>
@@ -160,21 +160,21 @@ export function NewRoleForm() {
             </div>
           </div>
 
-          {state.error && <p className="text-sm text-rose-600">{state.error}</p>}
-          {state.ok && <p className="text-sm text-emerald-600">{state.ok}</p>}
+          {state.error && <p className="text-sm text-danger">{state.error}</p>}
+          {state.ok && <p className="text-sm text-success">{state.ok}</p>}
 
-          <div className="flex justify-end gap-2 border-t border-slate-200 pt-4">
+          <div className="flex justify-end gap-2 border-t border-line pt-4">
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="rounded-md px-4 py-2 text-sm text-slate-600 hover:bg-slate-100"
+              className="rounded-md px-4 py-2 text-sm text-ink-muted hover:bg-surface-2"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={pending}
-              className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-fg hover:bg-primary-hover disabled:opacity-50"
             >
               {pending ? "Creating…" : "Create role"}
             </button>

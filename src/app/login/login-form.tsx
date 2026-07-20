@@ -1,10 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
+import { btnPrimary, inputBase } from "@/components/ui";
 import { login, type LoginState } from "./actions";
-
-const field =
-  "w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900";
 
 export function LoginForm() {
   const [state, formAction, pending] = useActionState<LoginState, FormData>(login, {});
@@ -12,7 +10,7 @@ export function LoginForm() {
   return (
     <form action={formAction} className="space-y-4">
       <div>
-        <label htmlFor="email" className="mb-1 block text-sm font-medium">
+        <label htmlFor="email" className="mb-1.5 block text-sm font-medium">
           Email
         </label>
         <input
@@ -22,12 +20,13 @@ export function LoginForm() {
           autoComplete="username"
           required
           autoFocus
-          className={field}
+          placeholder="you@company.com"
+          className={inputBase}
         />
       </div>
 
       <div>
-        <label htmlFor="password" className="mb-1 block text-sm font-medium">
+        <label htmlFor="password" className="mb-1.5 block text-sm font-medium">
           Password
         </label>
         <input
@@ -36,21 +35,21 @@ export function LoginForm() {
           type="password"
           autoComplete="current-password"
           required
-          className={field}
+          className={inputBase}
         />
       </div>
 
+      {/* role="alert" so screen readers announce the failure immediately */}
       {state.error && (
-        <p role="alert" className="text-sm text-rose-600">
+        <p
+          role="alert"
+          className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger ring-1 ring-danger-border ring-inset"
+        >
           {state.error}
         </p>
       )}
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="w-full rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
-      >
+      <button type="submit" disabled={pending} className={`${btnPrimary} w-full`}>
         {pending ? "Signing in…" : "Sign in"}
       </button>
     </form>
