@@ -28,7 +28,7 @@ export function Nav() {
             key={link.href}
             href={link.href}
             aria-current={active ? "page" : undefined}
-            className={`relative rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-150 ${
+            className={`relative inline-flex min-h-11 items-center rounded-lg px-2.5 text-sm font-medium transition-colors duration-150 sm:px-3 ${
               active
                 ? "bg-surface-2 text-ink"
                 : "text-ink-muted hover:bg-surface-hover hover:text-ink"

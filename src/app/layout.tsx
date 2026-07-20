@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
 import { getSessionUser } from "@/lib/auth";
@@ -23,6 +23,14 @@ export const metadata: Metadata = {
   description: "Applicant tracking and CV screening for construction hiring",
 };
 
+// Explicit rather than relying on the framework default. maximumScale is left
+// alone deliberately: capping zoom breaks accessibility for anyone who needs to
+// enlarge text.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -43,34 +51,57 @@ export default async function RootLayout({
         </a>
 
         <header className="sticky top-0 z-30 border-b border-line bg-surface/85 backdrop-blur-md">
-          <div className="mx-auto flex h-14 max-w-7xl items-center gap-6 px-6">
-            <Link href="/" className="flex items-center gap-2.5">
+          <div className="mx-auto flex h-14 max-w-7xl items-center gap-3 px-4 sm:gap-6 sm:px-6">
+            <Link href="/" className="flex min-h-11 shrink-0 items-center gap-2">
               <span
                 aria-hidden
                 className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-sm font-bold text-primary-fg"
               >
                 H
               </span>
-              <span className="text-[15px] font-semibold tracking-tight">Hirebase</span>
+              {/* Wordmark is the first thing to go when width is tight */}
+              <span className="hidden text-[15px] font-semibold tracking-tight sm:inline">
+                Hirebase
+              </span>
             </Link>
 
             {user && <Nav />}
 
             {user && (
-              <div className="ml-auto flex items-center gap-2">
-                <div className="hidden text-right sm:block">
+              <div className="ml-auto flex shrink-0 items-center gap-2">
+                <div className="hidden text-right md:block">
                   <p className="text-sm leading-tight font-medium">{user.name}</p>
                   <p className="text-xs text-ink-subtle capitalize">{user.role}</p>
                 </div>
                 <span
                   aria-hidden
-                  className="grid h-8 w-8 place-items-center rounded-full bg-surface-2 text-xs font-semibold text-ink-muted"
+                  className="hidden h-8 w-8 place-items-center rounded-full bg-surface-2 text-xs font-semibold text-ink-muted min-[380px]:grid"
                 >
                   {user.name.slice(0, 2).toUpperCase()}
                 </span>
                 <form action={logout}>
-                  <button type="submit" className={btnGhost}>
-                    Sign out
+                  {/* Icon-only below sm, but always labelled for screen readers
+                      and kept at a 44px touch target. */}
+                  <button
+                    type="submit"
+                    aria-label="Sign out"
+                    className={`${btnGhost} min-h-11 px-2 sm:px-3`}
+                  >
+                    <span className="hidden sm:inline">Sign out</span>
+                    <svg
+                      aria-hidden
+                      viewBox="0 0 20 20"
+                      fill="none"
+                      className="h-5 w-5 sm:hidden"
+                    >
+                      <path
+                        d="M12 6V4.5A1.5 1.5 0 0 0 10.5 3h-5A1.5 1.5 0 0 0 4 4.5v11A1.5 1.5 0 0 0 5.5 17h5a1.5 1.5 0 0 0 1.5-1.5V14M9 10h8m0 0-2.5-2.5M17 10l-2.5 2.5"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
                   </button>
                 </form>
               </div>
@@ -78,7 +109,8 @@ export default async function RootLayout({
           </div>
         </header>
 
-        <main id="main" className="mx-auto w-full max-w-7xl flex-1 px-6 py-8">
+        {/* Tighter gutters on phones; comfortable ones from tablet up */}
+        <main id="main" className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
           {children}
         </main>
       </body>

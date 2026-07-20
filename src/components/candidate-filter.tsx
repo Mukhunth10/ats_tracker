@@ -87,7 +87,9 @@ export function CandidateFilter({
       {/* --- Filter bar --- */}
       <div className="rounded-xl border border-line bg-surface p-3 shadow-card">
         <div className="flex flex-wrap items-center gap-2.5">
-          <div className="relative min-w-56 flex-1">
+          {/* Full width on phones so the search box is never squeezed into a
+              stub next to the dropdowns; shares the row from tablet up. */}
+          <div className="relative w-full sm:w-auto sm:min-w-56 sm:flex-1">
             <svg
               aria-hidden
               viewBox="0 0 20 20"
@@ -111,7 +113,7 @@ export function CandidateFilter({
             />
           </div>
 
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex min-h-11 items-center gap-2 text-sm">
             <span className="text-ink-muted">Min score</span>
             <input
               type="range"
@@ -201,7 +203,7 @@ export function CandidateFilter({
                 className="rise"
                 style={{ animationDelay: `${Math.min(i * 25, 200)}ms` }}
               >
-                <div className="group flex items-center gap-4 px-4 py-3 transition-colors duration-150 hover:bg-surface-hover">
+                <div className="group flex items-center gap-3 px-3 py-3 transition-colors duration-150 hover:bg-surface-hover sm:gap-4 sm:px-4">
                   <ScoreRing
                     score={r.aiScore ?? r.ruleScore}
                     label={r.aiScore !== null ? "AI score" : "Score"}

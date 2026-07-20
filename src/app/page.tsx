@@ -46,7 +46,7 @@ export default async function DashboardPage() {
     <div className="space-y-10">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Dashboard</h1>
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Dashboard</h1>
           <p className="mt-1 text-sm text-ink-muted">
             Hiring pipeline across every open role.
           </p>
@@ -55,7 +55,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* --- Headline numbers: the directors' view --- */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <Stat value={openRoles} label="Open roles" hint={`${jobs.length} total`} />
         <Stat
           value={all.length}
@@ -109,11 +109,11 @@ export default async function DashboardPage() {
                 <Link
                   key={job.id}
                   href={`/jobs/${job.id}`}
-                  className="rise group block"
+                  className="rise group block min-w-0"
                   // Stagger keeps a grid from flashing in all at once
                   style={{ animationDelay: `${Math.min(i * 40, 240)}ms` }}
                 >
-                  <Card interactive className="h-full p-5">
+                  <Card interactive className="h-full overflow-hidden p-4 sm:p-5">
                     <div className="flex items-start gap-4">
                       <div className="min-w-0 flex-1">
                         <h3 className="truncate font-semibold transition-colors group-hover:text-primary">

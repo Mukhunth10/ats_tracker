@@ -162,13 +162,16 @@ export function Card({
   children,
   className = "",
   interactive = false,
+  style,
 }: {
   children: React.ReactNode;
   className?: string;
   interactive?: boolean;
+  style?: React.CSSProperties;
 }) {
   return (
     <div
+      style={style}
       className={`rounded-xl border border-line bg-surface shadow-card ${
         interactive
           ? "transition-[box-shadow,transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-line-strong hover:shadow-lift"
@@ -210,11 +213,11 @@ export function Stat({
   tone?: Tone;
 }) {
   return (
-    <Card className="p-4">
-      <p className="text-xs font-medium tracking-wide text-ink-subtle uppercase">
+    <Card className="p-3 sm:p-4">
+      <p className="text-2xs font-medium tracking-wide text-ink-subtle uppercase sm:text-xs">
         {label}
       </p>
-      <p className={`tabular mt-1.5 text-3xl font-semibold ${TONE_TEXT[tone]}`}>{value}</p>
+      <p className={`tabular mt-1 text-2xl font-semibold sm:mt-1.5 sm:text-3xl ${TONE_TEXT[tone]}`}>{value}</p>
       {hint && <p className="mt-1 text-xs text-ink-subtle">{hint}</p>}
     </Card>
   );

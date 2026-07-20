@@ -22,7 +22,7 @@ export function NewRoleForm() {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-fg transition-colors hover:bg-primary-hover"
+        className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-fg transition-colors hover:bg-primary-hover"
       >
         New role
       </button>
@@ -30,9 +30,9 @@ export function NewRoleForm() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[rgb(15_23_42_/_0.5)] p-6">
-      <div className="w-full max-w-2xl rounded-lg bg-surface shadow-xl">
-        <div className="flex items-center justify-between border-b border-line px-6 py-4">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[rgb(15_23_42_/_0.5)] p-3 sm:p-6">
+      <div className="my-auto w-full max-w-2xl rounded-xl bg-surface shadow-modal">
+        <div className="flex items-center justify-between border-b border-line px-4 py-4 sm:px-6">
           <h2 className="font-semibold">New role</h2>
           <button
             onClick={() => setOpen(false)}
@@ -42,7 +42,7 @@ export function NewRoleForm() {
           </button>
         </div>
 
-        <form action={formAction} className="space-y-4 px-6 py-5">
+        <form action={formAction} className="space-y-4 px-4 py-5 sm:px-6">
           <div>
             <label className="mb-1 block text-sm font-medium">Title</label>
             <input
@@ -53,7 +53,7 @@ export function NewRoleForm() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium">Track</label>
               <input name="track" placeholder="Revit API / C#" className={field} />
