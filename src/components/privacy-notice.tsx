@@ -37,11 +37,18 @@ export function PrivacyNotice({
         <p>
           <strong className="text-ink">Why:</strong> to assess your suitability for the
           role you applied for. The webcam recording is reviewed by a member of our hiring
-          team to confirm you completed the task unaided.{" "}
+          team to confirm you completed the task unaided.
+        </p>
+        <p>
+          <strong className="text-ink">Attention prompts:</strong> while you work, your
+          browser checks whether you are facing the screen and may show you a reminder to
+          stay focused. This runs on your own device.{" "}
           <strong className="text-ink">
-            No automated decision or automated “cheating” detection is applied to your
-            recording — a person reviews it and decides.
-          </strong>
+            It never rejects you automatically — it only prompts a member of our team to
+            watch that part of the recording, and a person makes every decision.
+          </strong>{" "}
+          Looking at a second monitor or your keyboard is expected and is not held against
+          you.
         </p>
         <p>
           <strong className="text-ink">Legal basis:</strong> we rely on your consent for

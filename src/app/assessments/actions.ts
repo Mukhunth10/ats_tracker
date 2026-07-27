@@ -129,6 +129,9 @@ export async function submitAssessment(
       consentCamera,
       consentNoticeVersion: noticeVersion,
       consentAt: assessment.consentAt ?? new Date(),
+      // Attention monitoring result (a reviewer aid, computed client-side).
+      attentionAwaySec: Math.max(0, Math.round(Number(formData.get("attentionAwaySec")) || 0)),
+      attentionEvents: Math.max(0, Math.round(Number(formData.get("attentionEvents")) || 0)),
     },
   });
 

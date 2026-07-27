@@ -40,6 +40,9 @@ export interface AssessmentView {
   consentScreen: boolean;
   consentCamera: boolean;
   consentNoticeVersion: string;
+  /** Attention-monitoring result — a reviewer aid, never a verdict. */
+  attentionAwaySec: number;
+  attentionEvents: number;
   outputUrl: string;
   candidateNote: string;
   qualityScore: number | null;
@@ -160,6 +163,29 @@ export function AssessmentPanel({
               <span className="font-medium text-ink">Candidate note: </span>
               {assessment.candidateNote}
             </p>
+          )}
+          {/* Attention aid — framed so no one mistakes it for an auto-verdict. */}
+          {assessment.attentionEvents > 0 ? (
+            <div className="rounded-lg border border-warn-border bg-warn-soft p-3 text-sm">
+              <p className="font-medium text-warn">
+                Attention flag — looked away {assessment.attentionEvents}{" "}
+                {assessment.attentionEvents === 1 ? "time" : "times"}
+                {assessment.attentionAwaySec > 0
+                  ? `, about ${Math.round(assessment.attentionAwaySec / 60) || 1} min total`
+                  : ""}
+              </p>
+              <p className="mt-1 text-ink-muted">
+                This is a prompt to <strong>watch the recording</strong>, not a verdict.
+                Looking at a second monitor or the keyboard is normal for CAD work. You
+                decide.
+              </p>
+            </div>
+          ) : (
+            assessment.videoIsFile && (
+              <p className="text-xs text-ink-subtle">
+                Attention monitor: no sustained look-aways flagged.
+              </p>
+            )
           )}
           {assessment.consentAt && (
             <p className="border-t border-line pt-2 text-xs text-ink-subtle">

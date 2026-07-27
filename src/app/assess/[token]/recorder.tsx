@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { startAttentionMonitor, type AttentionMonitor, type AttentionStats } from "./attention";
 
 type Phase = "idle" | "recording" | "uploading" | "done" | "error";
 
@@ -27,12 +28,13 @@ export function Recorder({
   onUploaded,
 }: {
   token: string;
-  onUploaded: (ref: string) => void;
+  onUploaded: (ref: string, attention: AttentionStats) => void;
 }) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState("");
   const [progress, setProgress] = useState(0);
   const [seconds, setSeconds] = useState(0);
+  const [warn, setWarn] = useState(false);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -41,6 +43,14 @@ export function Recorder({
   const rafRef = useRef<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const previewRef = useRef<HTMLVideoElement | null>(null);
+  const attentionRef = useRef<AttentionMonitor | null>(null);
+  const statsRef = useRef<AttentionStats>({ awaySec: 0, events: 0 });
+  // Mirror of phase for async closures that would otherwise see a stale value.
+  const phaseRef = useRef<Phase>("idle");
+  const setPhaseBoth = (p: Phase) => {
+    phaseRef.current = p;
+    setPhase(p);
+  };
 
   const supported =
     typeof navigator !== "undefined" &&
@@ -93,6 +103,17 @@ export function Recorder({
     camVideo.muted = true;
     await camVideo.play();
 
+    // Attention monitoring runs on the camera feed. Best-effort: if it can't
+    // start, recording continues without it.
+    statsRef.current = { awaySec: 0, events: 0 };
+    startAttentionMonitor(camVideo, (active) => setWarn(active))
+      .then((m) => {
+        // If the user already stopped before the model finished loading, close it.
+        if (phaseRef.current !== "recording") m.stop();
+        else attentionRef.current = m;
+      })
+      .catch(() => {});
+
     // Cap output size so the file stays reasonable regardless of monitor size.
     const W = 1280;
     const H = 720;
@@ -138,12 +159,17 @@ export function Recorder({
 
     setSeconds(0);
     timerRef.current = setInterval(() => setSeconds((s) => s + 1), 1000);
-    setPhase("recording");
+    setPhaseBoth("recording");
   }
 
   function stop() {
     if (timerRef.current) clearInterval(timerRef.current);
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    // Capture attention stats before tearing the camera down.
+    if (attentionRef.current) {
+      statsRef.current = attentionRef.current.stop();
+      attentionRef.current = null;
+    }
     if (recorderRef.current && recorderRef.current.state !== "inactive") {
       recorderRef.current.stop();
     }
@@ -152,7 +178,7 @@ export function Recorder({
   }
 
   async function upload() {
-    setPhase("uploading");
+    setPhaseBoth("uploading");
     setProgress(0);
     try {
       const blob = new Blob(chunksRef.current, { type: "video/webm" });
@@ -174,11 +200,11 @@ export function Recorder({
         xhr.send(blob);
       });
 
-      onUploaded(target.ref);
-      setPhase("done");
+      onUploaded(target.ref, statsRef.current);
+      setPhaseBoth("done");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
-      setPhase("error");
+      setPhaseBoth("error");
     }
   }
 
@@ -204,14 +230,21 @@ export function Recorder({
       </p>
 
       {/* Live preview while recording, so they can check their framing */}
-      <video
-        ref={previewRef}
-        muted
-        playsInline
-        className={`mt-3 w-full rounded-lg border border-line bg-black ${
-          phase === "recording" ? "" : "hidden"
-        }`}
-      />
+      <div className={`relative mt-3 ${phase === "recording" ? "" : "hidden"}`}>
+        <video
+          ref={previewRef}
+          muted
+          playsInline
+          className="w-full rounded-lg border border-line bg-black"
+        />
+        {/* Attention warning — shown to the candidate, logged for the reviewer,
+            never an automatic rejection. */}
+        {warn && (
+          <div className="absolute inset-x-0 top-0 rounded-t-lg bg-danger px-3 py-2 text-center text-sm font-medium text-white">
+            Please keep your attention on the assessment until you finish.
+          </div>
+        )}
+      </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-3">
         {phase === "idle" && (

@@ -29,6 +29,7 @@ export function SubmitForm({
 
   const [videoUrl, setVideoUrl] = useState(defaults.videoUrl);
   const [recorded, setRecorded] = useState(false);
+  const [attention, setAttention] = useState({ awaySec: 0, events: 0 });
 
   const check = "mt-0.5 h-4 w-4 shrink-0 accent-[var(--primary)]";
 
@@ -85,9 +86,10 @@ export function SubmitForm({
           <div className="pt-1">
             <Recorder
               token={token}
-              onUploaded={(ref) => {
+              onUploaded={(ref, stats) => {
                 setVideoUrl(ref);
                 setRecorded(true);
+                setAttention(stats);
               }}
             />
           </div>
@@ -99,6 +101,8 @@ export function SubmitForm({
         <input type="hidden" name="consentScreen" value={consentScreen ? "1" : ""} />
         <input type="hidden" name="consentCamera" value={consentCamera ? "1" : ""} />
         <input type="hidden" name="noticeVersion" value={noticeVersion} />
+        <input type="hidden" name="attentionAwaySec" value={attention.awaySec} />
+        <input type="hidden" name="attentionEvents" value={attention.events} />
 
         <div>
           <label htmlFor="videoUrl" className="mb-1.5 block text-sm font-medium">

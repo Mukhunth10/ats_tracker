@@ -147,6 +147,14 @@ model Assessment {
   consentNoticeVersion String    @default("")
   consentAt            DateTime?
 
+  // Attention monitoring result, computed in the candidate's browser during the
+  // recording. A REVIEWER AID, never an automated decision: these are hints for
+  // a human to check against the footage, not a verdict. Because the detection
+  // runs client-side, a determined cheater could suppress it — the recording is
+  // the ground truth, these numbers are the "worth a look" signal.
+  attentionAwaySec Int @default(0)
+  attentionEvents  Int @default(0)
+
   // Reviewer's verdict. quality is the primary ranking key; durationMin is the
   // real working time from the recording and breaks ties between close scores.
   qualityScore Int?

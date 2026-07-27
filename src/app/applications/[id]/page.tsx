@@ -75,6 +75,8 @@ export default async function ApplicationPage(props: PageProps<"/applications/[i
         consentScreen: a.consentScreen,
         consentCamera: a.consentCamera,
         consentNoticeVersion: a.consentNoticeVersion,
+        attentionAwaySec: a.attentionAwaySec,
+        attentionEvents: a.attentionEvents,
         outputUrl: a.outputUrl,
         candidateNote: a.candidateNote,
         qualityScore: a.qualityScore,
