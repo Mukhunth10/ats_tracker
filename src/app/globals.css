@@ -53,6 +53,14 @@
   --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 1px 3px rgb(15 23 42 / 0.06);
   --shadow-lift: 0 4px 12px rgb(15 23 42 / 0.08), 0 2px 4px rgb(15 23 42 / 0.04);
   --shadow-modal: 0 20px 50px rgb(15 23 42 / 0.22);
+
+  /* Brand gradient — a single deep blue → indigo → violet sweep, used sparingly
+     on the logo, primary hero surfaces and the auth showcase. One accent, not a
+     rainbow, so the tool still reads as a serious instrument. */
+  --brand-1: #1e3a8a;
+  --brand-2: #3b52c4;
+  --brand-3: #6d3bda;
+  --brand-grad: linear-gradient(135deg, var(--brand-1) 0%, var(--brand-2) 45%, var(--brand-3) 100%);
 }
 
 /*
@@ -94,6 +102,11 @@
     --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4);
     --shadow-lift: 0 4px 14px rgb(0 0 0 / 0.5);
     --shadow-modal: 0 20px 50px rgb(0 0 0 / 0.65);
+
+    /* Brighter stops so the gradient still glows on a near-black background */
+    --brand-1: #3b52c4;
+    --brand-2: #6d3bda;
+    --brand-3: #9333ea;
   }
 }
 
@@ -172,7 +185,7 @@ body {
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
@@ -180,9 +193,96 @@ body {
   }
 }
 
-/* Entrance for cards and rows. transform + opacity only, never width/height. */
+/*
+ * Entrance for cards and rows. Deliberately gentle — a 4px lift over 200ms
+ * settles rather than "shoots in", so a full reload (or a live refresh) reads as
+ * calm, not jumpy. transform + opacity only, never width/height.
+ *
+ * On a soft/live refresh React reconciles existing elements in place, so only
+ * genuinely new rows animate — the board doesn't re-flash on every update.
+ */
 .rise {
-  animation: rise 260ms var(--ease-out-soft) both;
+  animation: rise 200ms var(--ease-out-soft) both;
+}
+
+/* A plain fade, for things that shouldn't move at all (panels, overlays). */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.fade-in {
+  animation: fade-in 240ms ease both;
+}
+
+/* --- Brand surfaces --- */
+
+/* The gradient logo tile and any hero panel that carries the brand. */
+.brand-grad {
+  background-image: var(--brand-grad);
+}
+
+/*
+ * A slow, low-contrast aurora that drifts behind the auth showcase. It moves
+ * over ~18s so it never competes for attention, and stops entirely under
+ * prefers-reduced-motion (handled by the global rule below).
+ */
+@keyframes aurora {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+.aurora {
+  background-image: var(--brand-grad);
+  background-size: 200% 200%;
+  animation: aurora 18s ease-in-out infinite;
+}
+
+/* --- Carousel --- */
+
+/* Slides crossfade in place; the leaving slide is absolutely positioned so the
+   panel height stays constant and nothing reflows. */
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.slide-in {
+  animation: slide-in 500ms var(--ease-out-soft) both;
+}
+
+/* Soft loading shimmer for skeleton states. */
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+.shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--surface-hover) 60%, transparent),
+    transparent
+  );
+  animation: shimmer 1.6s infinite;
 }
 
 /* Thin scrollbars inside panels, so a scroll region doesn't dominate the layout */

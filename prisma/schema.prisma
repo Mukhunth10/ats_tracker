@@ -82,8 +82,11 @@ model Application {
   jobId       String
   candidateId String
 
-  // Pipeline position
-  stage       String   @default("applied") // applied | screening | interview | offer | hired | rejected
+  // Pipeline position — Workday-style recruiting stages.
+  stage       String   @default("applied") // applied | screening | assessment | interview | offer | hired | rejected
+  // Why a candidate was declined (Workday-style disposition reason). Empty
+  // unless the stage is rejected — recorded for fair, auditable hiring.
+  dispositionReason String @default("")
 
   // Where the application came from: LinkedIn, Indeed, jobs.ie, careers page,
   // referral, agency. Free text so a new portal never needs a schema change.
@@ -165,6 +168,26 @@ model Assessment {
   createdAt DateTime @default(now())
 
   application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+}
+
+/// Audit trail — one row per meaningful action, the way Workday keeps a process
+/// history on every record. Answers "who did what, when" and feeds both the
+/// activity timeline and the real-time updates.
+model Activity {
+  id            String   @id @default(cuid())
+  jobId         String?
+  applicationId String?
+  /// Name of the staff member, or "candidate" / "system" for non-staff events.
+  actor         String   @default("system")
+  /// Machine type: stage_change | note | screened | uploaded | assessment_sent |
+  /// assessment_submitted | reviewed | created.
+  type          String
+  /// Human-readable one-liner shown in the timeline.
+  detail        String
+  createdAt     DateTime @default(now())
+
+  @@index([jobId, createdAt])
+  @@index([applicationId, createdAt])
 }
 
 model Note {

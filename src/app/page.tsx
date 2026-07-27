@@ -44,14 +44,26 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-10">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Dashboard</h1>
-          <p className="mt-1 text-sm text-ink-muted">
-            Hiring pipeline across every open role.
-          </p>
+      {/* Branded hero — a restrained gradient band that gives the dashboard a
+          confident header without shouting. */}
+      <div className="relative overflow-hidden rounded-2xl border border-line bg-surface p-6 shadow-card sm:p-8">
+        <div
+          aria-hidden
+          className="brand-grad pointer-events-none absolute inset-0 opacity-[0.07]"
+        />
+        <div
+          aria-hidden
+          className="brand-grad pointer-events-none absolute -top-16 -right-16 h-52 w-52 rounded-full opacity-20 blur-3xl"
+        />
+        <div className="relative flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Dashboard</h1>
+            <p className="mt-1 text-sm text-ink-muted">
+              Hiring pipeline across every open role.
+            </p>
+          </div>
+          <NewRoleForm />
         </div>
-        <NewRoleForm />
       </div>
 
       {/* --- Headline numbers: the directors' view --- */}
@@ -110,8 +122,9 @@ export default async function DashboardPage() {
                   key={job.id}
                   href={`/jobs/${job.id}`}
                   className="rise group block min-w-0"
-                  // Stagger keeps a grid from flashing in all at once
-                  style={{ animationDelay: `${Math.min(i * 40, 240)}ms` }}
+                  // A short, capped stagger settles the grid in without a
+                  // cascade — on reload it reads as calm, not "shooting in".
+                  style={{ animationDelay: `${Math.min(i * 25, 100)}ms` }}
                 >
                   <Card interactive className="h-full overflow-hidden p-4 sm:p-5">
                     <div className="flex items-start gap-4">

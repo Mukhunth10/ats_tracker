@@ -35,6 +35,14 @@ export function Nav() {
             }`}
           >
             {link.label}
+            {/* A gradient underline marks the current page — a small, deliberate
+                flourish that grows in rather than blinking on. */}
+            <span
+              aria-hidden
+              className={`brand-grad absolute inset-x-2.5 -bottom-px h-0.5 origin-left rounded-full transition-transform duration-300 ${
+                active ? "scale-x-100" : "scale-x-0"
+              }`}
+            />
           </Link>
         );
       })}

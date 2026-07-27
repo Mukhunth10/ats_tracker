@@ -9,6 +9,7 @@ import { scoreByAi, isAiConfigured } from "@/lib/score-ai";
 import { scoreByLocalAi, localAiConfigured, localAiAvailable } from "@/lib/score-local";
 import { requireUser } from "@/lib/auth";
 import { deleteStored } from "@/lib/storage";
+import { logActivity } from "@/lib/activity";
 
 /** Unpacks a Job row's JSON columns into the shape the scorer expects. */
 function criteriaFor(job: {
@@ -49,17 +50,36 @@ export type ActionState = { error?: string; ok?: string };
 const STAGES = ["applied", "screening", "interview", "offer", "hired", "rejected"] as const;
 export type Stage = (typeof STAGES)[number];
 
-export async function moveStage(applicationId: string, stage: string) {
-  await requireUser();
+export async function moveStage(applicationId: string, stage: string, reason?: string) {
+  const user = await requireUser();
   if (!STAGES.includes(stage as Stage)) return;
 
-  const app = await prisma.application.update({
+  const before = await prisma.application.findUnique({
     where: { id: applicationId },
-    data: { stage },
-    select: { jobId: true },
+    select: { jobId: true, stage: true, candidate: { select: { name: true } } },
+  });
+  if (!before) return;
+
+  // A disposition reason only applies when declining.
+  const dispositionReason = stage === "rejected" ? (reason ?? "").trim() : "";
+
+  await prisma.application.update({
+    where: { id: applicationId },
+    data: { stage, dispositionReason },
   });
 
-  revalidatePath(`/jobs/${app.jobId}`);
+  await logActivity({
+    jobId: before.jobId,
+    applicationId,
+    actor: user.name,
+    type: "stage_change",
+    detail:
+      stage === "rejected"
+        ? `Declined ${before.candidate.name}${dispositionReason ? ` — ${dispositionReason}` : ""}`
+        : `Moved ${before.candidate.name} to ${stage}`,
+  });
+
+  revalidatePath(`/jobs/${before.jobId}`);
   revalidatePath(`/applications/${applicationId}`);
 }
 
@@ -75,7 +95,23 @@ export async function addNote(
 
   // Attribute the note to whoever is signed in, rather than a generic label.
   await prisma.note.create({ data: { applicationId, body, author: user.name } });
+
+  const app = await prisma.application.findUnique({
+    where: { id: applicationId },
+    select: { jobId: true, candidate: { select: { name: true } } },
+  });
+  await logActivity({
+    jobId: app?.jobId,
+    applicationId,
+    actor: user.name,
+    type: "note",
+    detail: `Note on ${app?.candidate.name ?? "candidate"}: ${
+      body.length > 80 ? body.slice(0, 80) + "…" : body
+    }`,
+  });
+
   revalidatePath(`/applications/${applicationId}`);
+  revalidatePath(`/jobs/${app?.jobId}`);
   return { ok: "Note added." };
 }
 
@@ -123,6 +159,14 @@ async function runScreen(applicationId: string): Promise<ActionState> {
         aiDetail: JSON.stringify(result),
         aiScoredAt: new Date(),
       },
+    });
+
+    await logActivity({
+      jobId: app.jobId,
+      applicationId,
+      actor: `${provider} AI`,
+      type: "screened",
+      detail: `Screened ${app.candidate.name}: ${result.score}/100 (${result.recommendation})`,
     });
 
     revalidatePath(`/applications/${applicationId}`);
@@ -192,7 +236,7 @@ export async function uploadResume(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireUser();
+  const user = await requireUser();
 
   const files = formData.getAll("resume").filter((f): f is File => f instanceof File && f.size > 0);
   if (files.length === 0) {
@@ -254,7 +298,7 @@ export async function uploadResume(
         where: { jobId_candidateId: { jobId, candidateId: candidate.id } },
       });
 
-      await prisma.application.upsert({
+      const application = await prisma.application.upsert({
         where: { jobId_candidateId: { jobId, candidateId: candidate.id } },
         update: {
           ruleScore: rules.score,
@@ -283,6 +327,16 @@ export async function uploadResume(
       } else {
         added.push(`${candidate.name} (${rules.score})`);
       }
+
+      await logActivity({
+        jobId,
+        applicationId: application.id,
+        actor: user.name,
+        type: priorApplication ? "reviewed" : "uploaded",
+        detail: priorApplication
+          ? `Refreshed ${candidate.name} — rule score ${rules.score}`
+          : `Added ${candidate.name} (${source}) — rule score ${rules.score}`,
+      });
     } catch (err) {
       failed.push(`${file.name}: ${err instanceof Error ? err.message : "unreadable"}`);
     }
@@ -406,7 +460,7 @@ export async function deleteRecording(applicationId: string): Promise<void> {
 
 /** Create a role from the new-role form. */
 export async function createJob(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  await requireUser();
+  const user = await requireUser();
 
   const title = String(formData.get("title") ?? "").trim();
   if (!title) return { error: "Title is required." };
@@ -428,6 +482,13 @@ export async function createJob(_prev: ActionState, formData: FormData): Promise
         parseKeywordList(String(formData.get("customNiceToHave") ?? "")),
       ),
     },
+  });
+
+  await logActivity({
+    jobId: job.id,
+    actor: user.name,
+    type: "created",
+    detail: `Opened the "${job.title}" role`,
   });
 
   revalidatePath("/");

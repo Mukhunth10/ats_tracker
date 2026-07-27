@@ -9,6 +9,8 @@ import { Card, SectionTitle, SkillChip, STAGES } from "@/components/ui";
 import { CandidateFilter, type FilterRow } from "@/components/candidate-filter";
 import { UploadResume } from "@/components/upload-resume";
 import { KeywordEditor } from "@/components/keyword-editor";
+import { LiveJob } from "@/components/live-job";
+import { ActivityTimeline } from "@/components/activity-timeline";
 import { requirePageUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +34,14 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
   });
 
   if (!job) notFound();
+
+  // Recent process history for this role (Workday-style audit trail). Capped —
+  // the timeline is a "what just happened" view, not a full export.
+  const activities = await prisma.activity.findMany({
+    where: { jobId: id },
+    orderBy: { createdAt: "desc" },
+    take: 30,
+  });
 
   const mustHave = parseJson<string[]>(job.mustHave, []);
   const niceToHave = parseJson<string[]>(job.niceToHave, []);
@@ -96,8 +106,9 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
               {job.track} · {job.location} · {job.seniority} · {job.minYears}+ years
             </p>
           </div>
-          <div className="text-right text-sm text-ink-muted">
-            {job.applications.length} applicants
+          <div className="flex flex-col items-end gap-1 text-right text-sm text-ink-muted">
+            <span>{job.applications.length} applicants</span>
+            <LiveJob jobId={job.id} />
           </div>
         </div>
         {job.description && (
@@ -215,6 +226,13 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
                 niceToHave={customNiceToHave}
                 minYears={job.minYears}
               />
+            </Card>
+          </div>
+
+          <div>
+            <SectionTitle>Activity</SectionTitle>
+            <Card className="p-4">
+              <ActivityTimeline activities={activities} />
             </Card>
           </div>
         </div>

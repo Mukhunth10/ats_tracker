@@ -11,6 +11,7 @@ import { ScreenButton } from "@/components/screen-button";
 import { NoteForm } from "@/components/note-form";
 import { AssessmentPanel, type AssessmentView } from "@/components/assessment-panel";
 import { DangerActions } from "@/components/danger-actions";
+import { ActivityTimeline } from "@/components/activity-timeline";
 import { requirePageUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -56,6 +57,12 @@ export default async function ApplicationPage(props: PageProps<"/applications/[i
   });
 
   if (!app) notFound();
+
+  const activities = await prisma.activity.findMany({
+    where: { applicationId: id },
+    orderBy: { createdAt: "desc" },
+    take: 20,
+  });
 
   // Shape the assessment for the client panel; dates are pre-formatted on the
   // server so the panel needn't ship a date library, and the stored video
@@ -124,6 +131,12 @@ export default async function ApplicationPage(props: PageProps<"/applications/[i
             <StageSelect applicationId={app.id} stage={app.stage} />
           </div>
         </div>
+
+        {app.stage === "rejected" && app.dispositionReason && (
+          <div className="mt-4 rounded-lg border border-danger-border bg-danger-soft px-4 py-3 text-sm text-danger">
+            <span className="font-semibold">Declined</span> — {app.dispositionReason}
+          </div>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
@@ -366,6 +379,13 @@ export default async function ApplicationPage(props: PageProps<"/applications/[i
                   ))}
                 </ul>
               )}
+            </Card>
+          </div>
+
+          <div>
+            <SectionTitle>Activity</SectionTitle>
+            <Card className="p-4">
+              <ActivityTimeline activities={activities} />
             </Card>
           </div>
 

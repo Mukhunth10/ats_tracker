@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { logActivity } from "@/lib/activity";
 
 export type ActionState = { error?: string; ok?: string };
 
@@ -29,7 +30,7 @@ export async function sendAssessment(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireUser();
+  const user = await requireUser();
 
   const title = String(formData.get("title") ?? "").trim() || "Technical assessment";
   const instructions = String(formData.get("instructions") ?? "").trim();
@@ -65,12 +66,22 @@ export async function sendAssessment(
   });
 
   // Nudge the pipeline stage so a sent test is visible at a glance.
-  await prisma.application.update({
+  const app = await prisma.application.update({
     where: { id: applicationId },
-    data: { stage: "interview" },
+    data: { stage: "assessment" },
+    select: { jobId: true, candidate: { select: { name: true } } },
+  });
+
+  await logActivity({
+    jobId: app.jobId,
+    applicationId,
+    actor: user.name,
+    type: "assessment_sent",
+    detail: `Sent "${title}" to ${app.candidate.name}`,
   });
 
   revalidatePath(`/applications/${applicationId}`);
+  revalidatePath(`/jobs/${app.jobId}`);
   return { ok: "Assessment ready. Copy the candidate link below and send it to them." };
 }
 
@@ -135,7 +146,23 @@ export async function submitAssessment(
     },
   });
 
+  const app = await prisma.application.findUnique({
+    where: { id: assessment.applicationId },
+    select: { jobId: true, candidate: { select: { name: true } } },
+  });
+  const flagged = (Math.max(0, Math.round(Number(formData.get("attentionAwaySec")) || 0)) > 0);
+  await logActivity({
+    jobId: app?.jobId,
+    applicationId: assessment.applicationId,
+    actor: "candidate",
+    type: "assessment_submitted",
+    detail: `${app?.candidate.name ?? "Candidate"} submitted the assessment${
+      flagged ? " — attention flags to review" : ""
+    }`,
+  });
+
   revalidatePath(`/applications/${assessment.applicationId}`);
+  if (app) revalidatePath(`/jobs/${app.jobId}`);
   return { ok: "Submitted. Thank you — you can close this page." };
 }
 
@@ -145,7 +172,7 @@ export async function reviewAssessment(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  await requireUser();
+  const user = await requireUser();
 
   const quality = Number(formData.get("qualityScore"));
   const duration = formData.get("durationMin") ? Number(formData.get("durationMin")) : null;
@@ -169,11 +196,23 @@ export async function reviewAssessment(
     },
   });
 
-  revalidatePath(`/applications/${applicationId}`);
   const app = await prisma.assessment.findUnique({
     where: { applicationId },
-    select: { application: { select: { jobId: true } } },
+    select: {
+      application: { select: { jobId: true, candidate: { select: { name: true } } } },
+    },
   });
+  await logActivity({
+    jobId: app?.application.jobId,
+    applicationId,
+    actor: user.name,
+    type: "reviewed",
+    detail: `Reviewed ${app?.application.candidate.name ?? "candidate"}'s assessment — quality ${Math.round(
+      quality,
+    )}/100${duration !== null ? `, ${Math.round(duration)} min` : ""}`,
+  });
+
+  revalidatePath(`/applications/${applicationId}`);
   if (app) revalidatePath(`/jobs/${app.application.jobId}`);
 
   return { ok: "Review saved." };

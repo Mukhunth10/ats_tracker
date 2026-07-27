@@ -1,8 +1,11 @@
 import { labelForKey } from "@/lib/bim-taxonomy";
 
+// Workday-style recruiting pipeline, with an Assessment stage (the technical
+// test) between screening and interview.
 export const STAGES = [
   "applied",
   "screening",
+  "assessment",
   "interview",
   "offer",
   "hired",
@@ -13,11 +16,26 @@ export const STAGES = [
 export const STAGE_STYLE: Record<string, string> = {
   applied: "bg-surface-2 text-ink-muted ring-line",
   screening: "bg-primary-soft text-primary ring-primary/25",
+  assessment: "bg-primary-soft text-primary ring-primary/30",
   interview: "bg-primary-soft text-primary ring-primary/40",
   offer: "bg-warn-soft text-warn ring-warn-border",
   hired: "bg-success-soft text-success ring-success-border",
   rejected: "bg-danger-soft text-danger ring-danger-border",
 };
+
+/** Workday-style disposition reasons — chosen when a candidate is declined, so
+ *  rejections are consistent, reportable, and auditable. */
+export const DISPOSITION_REASONS = [
+  "Not enough relevant experience",
+  "Skills mismatch",
+  "Failed the technical assessment",
+  "Stronger candidates available",
+  "Position filled",
+  "Candidate withdrew",
+  "Salary expectations",
+  "Location / right to work",
+  "Other",
+] as const;
 
 type Tone = "success" | "warn" | "danger" | "neutral";
 
@@ -238,6 +256,7 @@ export function PipelineBar({
   const FILL: Record<string, string> = {
     applied: "bg-line-strong",
     screening: "bg-primary/50",
+    assessment: "bg-primary/70",
     interview: "bg-primary",
     offer: "bg-warn",
     hired: "bg-success",
@@ -289,10 +308,10 @@ export function EmptyState({
 /* --- Buttons: one primary per view, everything else subordinate --- */
 
 export const btnPrimary =
-  "inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-fg transition-colors duration-150 hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-fg shadow-sm transition-[background-color,transform,box-shadow] duration-150 hover:bg-primary-hover hover:shadow-md active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100";
 
 export const btnSecondary =
-  "inline-flex items-center justify-center gap-2 rounded-lg border border-line-strong bg-surface px-4 py-2 text-sm font-medium text-ink transition-colors duration-150 hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex items-center justify-center gap-2 rounded-lg border border-line-strong bg-surface px-4 py-2 text-sm font-medium text-ink transition-[background-color,transform] duration-150 hover:bg-surface-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100";
 
 export const btnGhost =
   "inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-ink-muted transition-colors duration-150 hover:bg-surface-hover hover:text-ink";

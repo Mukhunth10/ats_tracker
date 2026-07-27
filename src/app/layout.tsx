@@ -52,10 +52,10 @@ export default async function RootLayout({
 
         <header className="sticky top-0 z-30 border-b border-line bg-surface/85 backdrop-blur-md">
           <div className="mx-auto flex h-14 max-w-7xl items-center gap-3 px-4 sm:gap-6 sm:px-6">
-            <Link href="/" className="flex min-h-11 shrink-0 items-center gap-2">
+            <Link href="/" className="group flex min-h-11 shrink-0 items-center gap-2">
               <span
                 aria-hidden
-                className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-sm font-bold text-primary-fg"
+                className="brand-grad grid h-8 w-8 place-items-center rounded-lg text-sm font-bold text-white shadow-sm transition-transform duration-200 group-hover:scale-105"
               >
                 H
               </span>
