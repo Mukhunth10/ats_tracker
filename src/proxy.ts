@@ -19,6 +19,11 @@ export function proxy(request: NextRequest) {
   // get far enough to sign in.
   if (
     pathname.startsWith("/login") ||
+    pathname.startsWith("/signup") ||
+    // Candidates have no account. The assessment page (and its submit action,
+    // which POSTs to the same /assess/<token> path) authenticates by the secret
+    // token in the URL, not a session cookie, so it must stay reachable.
+    pathname.startsWith("/assess") ||
     pathname.startsWith("/_next") ||
     pathname === "/favicon.ico"
   ) {

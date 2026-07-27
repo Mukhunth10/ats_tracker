@@ -104,12 +104,50 @@ model Application {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  job       Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
-  notes     Note[]
+  job        Job         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  candidate  Candidate   @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  notes      Note[]
+  assessment Assessment?
 
   @@unique([jobId, candidateId])
   @@index([jobId, stage])
+}
+
+/// A technical test sent to a shortlisted candidate — e.g. a Revit modelling
+/// task for a BIM Lead role. The candidate has no login, so they submit through
+/// a secret tokenised link. Timing is captured two ways: wall-clock from send to
+/// submit (automatic, but includes idle time), and the real working duration a
+/// reviewer reads off the screen recording (the trustworthy speed metric).
+model Assessment {
+  id            String   @id @default(cuid())
+  applicationId String   @unique
+  title         String   @default("Technical assessment")
+  instructions  String   @default("")
+  /// Link to the test file you send them (Drive/Dropbox/WeTransfer).
+  testUrl       String   @default("")
+  /// Random secret that gates the public submission page.
+  token         String   @unique
+
+  status      String    @default("sent") // sent | submitted | reviewed
+  sentAt      DateTime  @default(now())
+  submittedAt DateTime?
+
+  // What the candidate returns — links, not uploads, so a multi-hundred-MB
+  // screen recording never has to stream through the browser.
+  videoUrl      String @default("")
+  outputUrl     String @default("")
+  candidateNote String @default("")
+
+  // Reviewer's verdict. quality is the primary ranking key; durationMin is the
+  // real working time from the recording and breaks ties between close scores.
+  qualityScore Int?
+  durationMin  Int?
+  reviewNotes  String    @default("")
+  reviewedAt   DateTime?
+
+  createdAt DateTime @default(now())
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 }
 
 model Note {

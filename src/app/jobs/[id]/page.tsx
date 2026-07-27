@@ -21,7 +21,7 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
     where: { id },
     include: {
       applications: {
-        include: { candidate: true },
+        include: { candidate: true, assessment: true },
         // Rank by AI verdict where it exists, baseline otherwise. SQLite sorts
         // NULLs first on DESC, so unscored rows are re-sorted below in JS.
         orderBy: [{ ruleScore: "desc" }],
@@ -65,6 +65,10 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
       proven: detail.demonstrated?.length ?? 0,
       missing: detail.missingMustHave ?? [],
       source: app.source,
+      // Only a reviewed assessment counts for ranking — a sent-but-not-scored
+      // one has no result yet.
+      assessScore: app.assessment?.status === "reviewed" ? app.assessment.qualityScore : null,
+      assessMin: app.assessment?.status === "reviewed" ? app.assessment.durationMin : null,
       haystack: app.candidate.resumeText.toLowerCase(),
     };
   });

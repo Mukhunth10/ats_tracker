@@ -8,6 +8,7 @@ import { Card, ScoreRing, SectionTitle, SkillChip } from "@/components/ui";
 import { StageSelect } from "@/components/stage-select";
 import { ScreenButton } from "@/components/screen-button";
 import { NoteForm } from "@/components/note-form";
+import { AssessmentPanel, type AssessmentView } from "@/components/assessment-panel";
 import { requirePageUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -30,10 +31,33 @@ export default async function ApplicationPage(props: PageProps<"/applications/[i
       candidate: true,
       job: true,
       notes: { orderBy: { createdAt: "desc" } },
+      assessment: true,
     },
   });
 
   if (!app) notFound();
+
+  // Shape the assessment for the client panel; dates are pre-formatted on the
+  // server so the panel needn't ship a date library.
+  const a = app.assessment;
+  const assessmentView: AssessmentView | null = a
+    ? {
+        status: a.status as AssessmentView["status"],
+        title: a.title,
+        token: a.token,
+        sentAt: a.sentAt.toLocaleString(),
+        submittedAt: a.submittedAt?.toLocaleString() ?? null,
+        videoUrl: a.videoUrl,
+        outputUrl: a.outputUrl,
+        candidateNote: a.candidateNote,
+        qualityScore: a.qualityScore,
+        durationMin: a.durationMin,
+        reviewNotes: a.reviewNotes,
+        elapsedMin: a.submittedAt
+          ? Math.max(0, Math.round((a.submittedAt.getTime() - a.sentAt.getTime()) / 60000))
+          : null,
+      }
+    : null;
 
   const rules = parseJson<Partial<RuleDetail>>(app.ruleDetail, {});
   const ai = app.aiDetail ? parseJson<AiResult | null>(app.aiDetail, null) : null;
@@ -246,6 +270,13 @@ export default async function ApplicationPage(props: PageProps<"/applications/[i
 
         {/* --- Sidebar --- */}
         <div className="space-y-6">
+          <div>
+            <SectionTitle>Technical assessment</SectionTitle>
+            <Card className="p-4">
+              <AssessmentPanel applicationId={app.id} assessment={assessmentView} />
+            </Card>
+          </div>
+
           {aiEnabled && (
             <div>
               <SectionTitle>Actions</SectionTitle>

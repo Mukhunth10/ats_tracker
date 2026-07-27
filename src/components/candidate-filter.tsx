@@ -18,11 +18,14 @@ export interface FilterRow {
   /** Portal the application arrived through. Optional so a row written before
    *  source tracking existed renders instead of crashing the list. */
   source?: string | null;
+  /** Assessment result, when one has been reviewed. */
+  assessScore?: number | null;
+  assessMin?: number | null;
   /** Lowercased resume text, for keyword search. */
   haystack: string;
 }
 
-type SortKey = "score" | "name" | "proven";
+type SortKey = "score" | "name" | "proven" | "assessment";
 
 /**
  * The screen recruiters spend their day in.
@@ -73,6 +76,15 @@ export function CandidateFilter({
     return result.sort((a, b) => {
       if (sort === "name") return a.name.localeCompare(b.name);
       if (sort === "proven") return b.proven - a.proven;
+      if (sort === "assessment") {
+        // Quality first; a candidate with no assessment sinks below any who has
+        // one. Working time (fewer minutes = faster) breaks ties on quality —
+        // exactly "who did it well in the least time".
+        const qa = a.assessScore ?? -1;
+        const qb = b.assessScore ?? -1;
+        if (qb !== qa) return qb - qa;
+        return (a.assessMin ?? Infinity) - (b.assessMin ?? Infinity);
+      }
       return (b.aiScore ?? b.ruleScore) - (a.aiScore ?? a.ruleScore);
     });
   }, [rows, minScore, stage, source, query, sort]);
@@ -164,7 +176,8 @@ export function CandidateFilter({
             aria-label="Sort by"
             className={control}
           >
-            <option value="score">Sort: score</option>
+            <option value="score">Sort: CV score</option>
+            <option value="assessment">Sort: test result</option>
             <option value="proven">Sort: proven skills</option>
             <option value="name">Sort: name</option>
           </select>
@@ -248,6 +261,15 @@ export function CandidateFilter({
                   </Link>
 
                   <div className="flex shrink-0 items-center gap-3">
+                    {r.assessScore != null && (
+                      <span
+                        className="hidden rounded-md bg-success-soft px-2 py-0.5 text-xs font-medium text-success ring-1 ring-success-border ring-inset sm:inline"
+                        title="Technical test result"
+                      >
+                        Test {r.assessScore}
+                        {r.assessMin != null ? ` · ${r.assessMin}m` : ""}
+                      </span>
+                    )}
                     {aiEnabled && r.aiScore !== null && (
                       <span className="hidden rounded-md bg-primary-soft px-2 py-0.5 text-xs font-medium text-primary sm:inline">
                         AI

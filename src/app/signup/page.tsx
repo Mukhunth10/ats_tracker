@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
-import { LoginForm } from "./login-form";
+import { SignupForm } from "./signup-form";
 
 export const dynamic = "force-dynamic";
 
-export default async function LoginPage() {
-  // Already signed in? Don't show the form again.
+export default async function SignupPage() {
   if (await getSessionUser()) redirect("/");
+
+  // Self-signup is available only when an invite code is configured.
+  const enabled = Boolean(process.env.SIGNUP_CODE);
 
   return (
     <div className="mx-auto flex min-h-[75vh] max-w-sm flex-col justify-center">
@@ -19,26 +21,26 @@ export default async function LoginPage() {
           >
             H
           </span>
-          <h1 className="text-xl font-semibold tracking-tight">Sign in to Hirebase</h1>
-          <p className="mt-1.5 text-sm text-ink-muted">
-            Construction recruitment and CV screening
-          </p>
+          <h1 className="text-xl font-semibold tracking-tight">Create your account</h1>
+          <p className="mt-1.5 text-sm text-ink-muted">Hirebase — construction recruitment</p>
         </div>
 
         <div className="rounded-xl border border-line bg-surface p-6 shadow-card">
-          <LoginForm />
+          {enabled ? (
+            <SignupForm />
+          ) : (
+            <p className="text-sm text-ink-muted">
+              Self-signup is turned off. Ask your administrator to create an account for
+              you.
+            </p>
+          )}
         </div>
 
         <p className="mt-6 text-center text-sm text-ink-muted">
-          Have an invite code?{" "}
-          <Link href="/signup" className="font-medium text-primary hover:underline">
-            Create an account
+          Already have an account?{" "}
+          <Link href="/login" className="font-medium text-primary hover:underline">
+            Sign in
           </Link>
-        </p>
-
-        <p className="mt-4 text-center text-xs leading-relaxed text-ink-subtle">
-          Candidate records are confidential. Do not share your login or leave this open
-          on a shared machine.
         </p>
       </div>
     </div>
