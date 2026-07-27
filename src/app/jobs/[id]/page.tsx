@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { prisma, parseJson } from "@/lib/db";
 import type { RuleDetail } from "@/lib/score-rules";
 import { isAiConfigured } from "@/lib/score-ai";
+import { localAiConfigured, localAiAvailable } from "@/lib/score-local";
+import { ScreenJobButton } from "@/components/screen-job-button";
 import { Card, SectionTitle, SkillChip, STAGES } from "@/components/ui";
 import { CandidateFilter, type FilterRow } from "@/components/candidate-filter";
 import { UploadResume } from "@/components/upload-resume";
@@ -34,7 +36,10 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
   const mustHave = parseJson<string[]>(job.mustHave, []);
   const niceToHave = parseJson<string[]>(job.niceToHave, []);
 
-  const aiEnabled = isAiConfigured();
+  const localReady = localAiConfigured() && (await localAiAvailable());
+  const aiEnabled = localReady || isAiConfigured();
+  const aiProvider: "local" | "claude" = localReady ? "local" : "claude";
+  const unscreened = job.applications.filter((a) => a.aiScore === null).length;
   const customMustHave = parseJson<string[]>(job.customMustHave, []);
   const customNiceToHave = parseJson<string[]>(job.customNiceToHave, []);
 
@@ -137,7 +142,19 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="space-y-6">
           <div>
-            <SectionTitle>Ranked candidates</SectionTitle>
+            <SectionTitle
+              action={
+                aiEnabled && unscreened > 0 ? (
+                  <ScreenJobButton
+                    jobId={job.id}
+                    pendingCount={unscreened}
+                    provider={aiProvider}
+                  />
+                ) : undefined
+              }
+            >
+              Ranked candidates
+            </SectionTitle>
             {ranked.length === 0 ? (
               <Card className="p-10 text-center text-sm text-ink-muted">
                 No candidates yet. Upload a resume to get started.

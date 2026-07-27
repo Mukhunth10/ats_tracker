@@ -6,6 +6,7 @@ import { extractText, extractContact } from "@/lib/resume-parse";
 import { redirect } from "next/navigation";
 import { scoreCandidate, type JobCriteria } from "@/lib/score-rules";
 import { scoreByAi, isAiConfigured } from "@/lib/score-ai";
+import { scoreByLocalAi, localAiConfigured, localAiAvailable } from "@/lib/score-local";
 import { requireUser } from "@/lib/auth";
 import { deleteStored } from "@/lib/storage";
 
@@ -78,33 +79,41 @@ export async function addNote(
   return { ok: "Note added." };
 }
 
-/** Runs Claude screening and stores the verdict. Surfaced as a button in the UI. */
-export async function screenWithAi(
-  applicationId: string,
-  _prev: ActionState,
-): Promise<ActionState> {
-  await requireUser();
-
-  if (!isAiConfigured()) {
-    return { error: "ANTHROPIC_API_KEY is not set. Add it to .env and restart the dev server." };
-  }
-
+/**
+ * LLM screening. Prefers the free, private local model (Ollama) when it's
+ * available; otherwise uses the paid Claude screener. The stored result is the
+ * same shape either way, so the UI doesn't care which ran.
+ */
+async function runScreen(applicationId: string): Promise<ActionState> {
   const app = await prisma.application.findUnique({
     where: { id: applicationId },
     include: { candidate: true, job: true },
   });
   if (!app) return { error: "Application not found." };
 
+  const jobArg = {
+    title: app.job.title,
+    track: app.job.track,
+    seniority: app.job.seniority,
+    minYears: app.job.minYears,
+    description: app.job.description,
+    mustHave: parseJson<string[]>(app.job.mustHave, []),
+    niceToHave: parseJson<string[]>(app.job.niceToHave, []),
+  };
+
+  const useLocal = localAiConfigured() && (await localAiAvailable());
+  if (!useLocal && !isAiConfigured()) {
+    return {
+      error:
+        "No AI screener available. Either run Ollama locally (free, see .env) or set ANTHROPIC_API_KEY.",
+    };
+  }
+
+  const provider = useLocal ? "local" : "Claude";
   try {
-    const result = await scoreByAi(app.candidate.resumeText, {
-      title: app.job.title,
-      track: app.job.track,
-      seniority: app.job.seniority,
-      minYears: app.job.minYears,
-      description: app.job.description,
-      mustHave: parseJson<string[]>(app.job.mustHave, []),
-      niceToHave: parseJson<string[]>(app.job.niceToHave, []),
-    });
+    const result = useLocal
+      ? await scoreByLocalAi(app.candidate.resumeText, jobArg)
+      : await scoreByAi(app.candidate.resumeText, jobArg);
 
     await prisma.application.update({
       where: { id: applicationId },
@@ -118,11 +127,55 @@ export async function screenWithAi(
 
     revalidatePath(`/applications/${applicationId}`);
     revalidatePath(`/jobs/${app.jobId}`);
-    return { ok: `Screened — ${result.score}/100 (${result.recommendation}).` };
+    return {
+      ok: `Screened with ${provider} AI — ${result.score}/100 (${result.recommendation}).`,
+    };
   } catch (err) {
-    console.error("AI screening failed", err);
+    console.error(`${provider} screening failed`, err);
     return { error: err instanceof Error ? err.message : "Screening failed." };
   }
+}
+
+/** Screen one application. Surfaced as a button on the candidate page. */
+export async function screenWithAi(
+  applicationId: string,
+  _prev: ActionState,
+): Promise<ActionState> {
+  await requireUser();
+  return runScreen(applicationId);
+}
+
+/**
+ * Agentic batch screen: screen every not-yet-screened candidate on a role in one
+ * action. Runs sequentially so a local model isn't overwhelmed, and reports how
+ * many it processed. This is the "autonomously evaluate the whole pipeline" step.
+ */
+export async function screenJob(jobId: string, _prev: ActionState): Promise<ActionState> {
+  await requireUser();
+
+  const useLocal = localAiConfigured() && (await localAiAvailable());
+  if (!useLocal && !isAiConfigured()) {
+    return { error: "No AI screener available. Run Ollama locally, or set ANTHROPIC_API_KEY." };
+  }
+
+  const pending = await prisma.application.findMany({
+    where: { jobId, aiScore: null },
+    select: { id: true },
+  });
+  if (pending.length === 0) return { ok: "Everyone on this role is already screened." };
+
+  let done = 0;
+  let failed = 0;
+  for (const { id } of pending) {
+    const r = await runScreen(id);
+    if (r.error) failed++;
+    else done++;
+  }
+
+  revalidatePath(`/jobs/${jobId}`);
+  return {
+    ok: `Screened ${done} candidate${done === 1 ? "" : "s"}${failed ? `, ${failed} failed` : ""}.`,
+  };
 }
 
 /**

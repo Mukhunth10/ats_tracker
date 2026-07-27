@@ -4,6 +4,7 @@ import { prisma, parseJson } from "@/lib/db";
 import type { RuleDetail } from "@/lib/score-rules";
 import type { AiResult } from "@/lib/score-ai";
 import { isAiConfigured } from "@/lib/score-ai";
+import { localAiConfigured, localAiAvailable } from "@/lib/score-local";
 import { Card, ScoreRing, SectionTitle, SkillChip } from "@/components/ui";
 import { StageSelect } from "@/components/stage-select";
 import { ScreenButton } from "@/components/screen-button";
@@ -95,7 +96,10 @@ export default async function ApplicationPage(props: PageProps<"/applications/[i
   // AI screening is the only feature that costs money. When no key is set it is
   // hidden entirely rather than shown as a dead button, so nobody on the HR
   // team clicks something that cannot work.
-  const aiEnabled = isAiConfigured();
+  // Screening is available if either provider is: free local Ollama, or Claude.
+  const localReady = localAiConfigured() && (await localAiAvailable());
+  const aiEnabled = localReady || isAiConfigured();
+  const aiProvider = localReady ? "local" : isAiConfigured() ? "claude" : "none";
 
   return (
     <div className="space-y-6">
@@ -330,11 +334,17 @@ export default async function ApplicationPage(props: PageProps<"/applications/[i
 
           {aiEnabled && (
             <div>
-              <SectionTitle>Actions</SectionTitle>
+              <SectionTitle>AI screening</SectionTitle>
               <Card className="p-4">
-                <ScreenButton applicationId={app.id} alreadyScored={app.aiScore !== null} />
+                <ScreenButton
+                  applicationId={app.id}
+                  alreadyScored={app.aiScore !== null}
+                  provider={aiProvider}
+                />
                 <p className="mt-2 text-xs text-ink-subtle">
-                  Costs roughly $0.04–0.08 per run.
+                  {aiProvider === "local"
+                    ? "Running on your local model — free and private, nothing leaves this machine."
+                    : "Uses the Claude API — roughly $0.04–0.08 per run."}
                 </p>
               </Card>
             </div>
