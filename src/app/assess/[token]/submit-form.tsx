@@ -35,8 +35,9 @@ export function SubmitForm({
             className="mt-0.5 h-4 w-4 accent-[var(--primary)]"
           />
           <span className="text-sm text-ink">
-            I agree to record my screen for this assessment and to my recording being
-            reviewed by the hiring team. I understand what is being captured.
+            I agree to record my <strong>screen and camera</strong> for this assessment,
+            and to the recording being reviewed by the hiring team. I understand my face
+            is captured while I work and that this is used only to assess this test.
           </span>
         </label>
 

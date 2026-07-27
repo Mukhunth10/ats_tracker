@@ -1,12 +1,29 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, useTransition } from "react";
 import {
   sendAssessment,
   reviewAssessment,
   type ActionState,
 } from "@/app/assessments/actions";
 import { btnPrimary, btnSecondary, inputBase, ScoreRing } from "./ui";
+
+/** Uploads a staff test file (authed) and returns its stored reference. */
+async function uploadTestFile(file: File): Promise<string> {
+  const ext = file.name.split(".").pop() || "zip";
+  const target = await fetch(`/api/assessment-file?ext=${encodeURIComponent(ext)}`).then((r) =>
+    r.json(),
+  );
+  if (target.error) throw new Error(target.error);
+
+  const res = await fetch(target.uploadUrl, {
+    method: "PUT",
+    headers: { "Content-Type": "application/octet-stream" },
+    body: file,
+  });
+  if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+  return target.ref;
+}
 
 export interface AssessmentView {
   status: "sent" | "submitted" | "reviewed";
@@ -199,15 +216,47 @@ function SendForm({
   resend?: boolean;
   defaultTitle?: string;
 }) {
-  const action = sendAssessment.bind(null, applicationId);
-  const [state, formAction, pending] = useActionState<ActionState, FormData>(action, {});
+  const [pending, startTransition] = useTransition();
+  const [uploading, setUploading] = useState(false);
+  const [state, setState] = useState<ActionState>({});
+
+  // Upload the chosen file (if any) before sending, so a big .zip goes to
+  // storage directly rather than through the server action's 1MB limit.
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    const file = fd.get("testFile");
+
+    setState({});
+    try {
+      if (file instanceof File && file.size > 0) {
+        setUploading(true);
+        const ref = await uploadTestFile(file);
+        setUploading(false);
+        fd.set("testUrl", ref); // the stored reference replaces the link field
+      }
+    } catch (err) {
+      setUploading(false);
+      setState({ error: err instanceof Error ? err.message : "File upload failed" });
+      return;
+    }
+    fd.delete("testFile");
+
+    startTransition(async () => {
+      const result = await sendAssessment(applicationId, {}, fd);
+      setState(result);
+      if (result.ok) form.reset();
+    });
+  }
+
+  const busy = pending || uploading;
 
   return (
-    <form action={formAction} className="space-y-3">
+    <form onSubmit={onSubmit} className="space-y-3">
       {!resend && (
         <p className="text-sm text-ink-muted">
-          Send a technical test with a private link the candidate can open without an
-          account.
+          Send a technical test with a private link the candidate opens without an account.
         </p>
       )}
       <div>
@@ -219,26 +268,38 @@ function SendForm({
         <textarea
           name="instructions"
           rows={3}
-          placeholder="e.g. Model the attached floor plan to LOD 300 in Revit. Set up sheets and a schedule. Record your screen throughout."
+          placeholder="e.g. Model the attached floor plan to LOD 300 in Revit. Set up sheets and a schedule."
           className={inputBase}
         />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium">Test file link</label>
+        <label className="mb-1 block text-sm font-medium">Test file</label>
+        <input
+          type="file"
+          name="testFile"
+          className="w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-primary file:px-3 file:py-2 file:text-sm file:font-medium file:text-primary-fg hover:file:bg-primary-hover"
+        />
+        <p className="mt-1 text-xs text-ink-subtle">
+          Upload the .zip / .rvt directly (stored on your own storage), or paste a link
+          below instead.
+        </p>
         <input
           name="testUrl"
           type="url"
-          placeholder="Link to the .rvt / .zip on Drive, Dropbox or WeTransfer"
-          className={inputBase}
+          placeholder="…or a Drive / Dropbox / WeTransfer link"
+          className={`${inputBase} mt-2`}
         />
-        <p className="mt-1 text-xs text-ink-subtle">
-          Upload the file to your own Drive/Dropbox and paste the share link here.
-        </p>
       </div>
       {state.error && <p className="text-sm text-danger">{state.error}</p>}
       {state.ok && <p className="text-sm text-success">{state.ok}</p>}
-      <button type="submit" disabled={pending} className={`${btnPrimary} w-full`}>
-        {pending ? "Preparing…" : resend ? "Resend (resets the clock)" : "Create assessment"}
+      <button type="submit" disabled={busy} className={`${btnPrimary} w-full`}>
+        {uploading
+          ? "Uploading file…"
+          : pending
+            ? "Preparing…"
+            : resend
+              ? "Resend (resets the clock)"
+              : "Create assessment"}
       </button>
     </form>
   );

@@ -6,16 +6,16 @@ import { uploadResume, type ActionState } from "@/app/actions";
 const field =
   "w-full rounded-md border border-line-strong px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary";
 
-/** Common intake channels. Free text, so an unlisted portal still works. */
+/** Common intake channels worldwide. Free text, so any unlisted portal works. */
 const SOURCES = [
   "LinkedIn",
   "Indeed",
-  "jobs.ie",
   "Careers page",
   "Referral",
   "Agency",
-  "Naukri",
   "Email",
+  "Glassdoor",
+  "Dice",
   "direct",
 ];
 

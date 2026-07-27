@@ -5,21 +5,22 @@ import { useRef, useState } from "react";
 type Phase = "idle" | "recording" | "uploading" | "done" | "error";
 
 /**
- * In-browser screen recorder.
+ * Screen + webcam recorder.
  *
- * Uses the standard browser APIs — getDisplayMedia to capture the screen,
- * MediaRecorder to encode it — so there is nothing to install and no cost. It
- * is cooperative by design: the browser shows the candidate a permission prompt
- * and they choose what to share. Covert capture is impossible here (and illegal
- * under GDPR), which is exactly right.
+ * Captures the screen (getDisplayMedia) and the webcam (getUserMedia), then
+ * composites them onto a canvas — screen filling the frame, the candidate's face
+ * in the bottom-right corner — and records that single canvas as one video. A
+ * reviewer watches one recording and sees both the work and the person's face
+ * and eyes throughout.
  *
- * On stop, the recording is uploaded — straight to Cloudflare R2 via a presigned
- * URL when configured, otherwise to the app's own disk. The resulting reference
- * is handed back so the submission form can save it.
+ * This is deliberately cooperative: the browser prompts for screen-share and
+ * camera permission, and the candidate sees exactly what is captured. There is
+ * no covert capture and no automated "cheating" verdict — a human reviews the
+ * footage and judges. Covert capture would be both impossible here and unlawful
+ * under GDPR.
  *
- * Requires a secure context (https or localhost); getDisplayMedia is blocked on
- * plain http, so a LAN IP like http://192.168.x.x will not work — use the tunnel
- * URL or localhost.
+ * Requires a secure context (https or localhost). On plain http (e.g. a LAN IP)
+ * browsers block both screen and camera access.
  */
 export function Recorder({
   token,
@@ -35,56 +36,119 @@ export function Recorder({
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const streamRef = useRef<MediaStream | null>(null);
+  const screenRef = useRef<MediaStream | null>(null);
+  const camRef = useRef<MediaStream | null>(null);
+  const rafRef = useRef<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const previewRef = useRef<HTMLVideoElement | null>(null);
 
   const supported =
     typeof navigator !== "undefined" &&
     typeof navigator.mediaDevices?.getDisplayMedia === "function" &&
+    typeof navigator.mediaDevices?.getUserMedia === "function" &&
     typeof window.MediaRecorder === "function";
 
   async function start() {
     setError("");
+    let screen: MediaStream;
+    let cam: MediaStream;
+
+    // Screen first — if they cancel this prompt there is nothing to clean up.
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: { frameRate: 10 }, // low frame rate keeps the file small
+      screen = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: 10 },
         audio: false,
       });
-      streamRef.current = stream;
-
-      // If the candidate stops sharing from the browser's own bar, treat it as
-      // stop-and-upload rather than losing the recording.
-      stream.getVideoTracks()[0].addEventListener("ended", () => stop());
-
-      const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-        ? "video/webm;codecs=vp9"
-        : "video/webm";
-      const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 1_500_000 });
-      chunksRef.current = [];
-      rec.ondataavailable = (e) => e.data.size > 0 && chunksRef.current.push(e.data);
-      rec.onstop = upload;
-      rec.start(1000); // gather a chunk each second
-      recorderRef.current = rec;
-
-      setSeconds(0);
-      timerRef.current = setInterval(() => setSeconds((s) => s + 1), 1000);
-      setPhase("recording");
-    } catch (err) {
-      // Permission denied / cancelled is the common case — not an error to shout about.
-      const msg = err instanceof Error ? err.message : "Could not start recording";
-      setError(
-        /denied|Permission/i.test(msg)
-          ? "Screen sharing was cancelled. Click record and choose “Entire Screen”."
-          : msg,
-      );
-      setPhase("idle");
+    } catch {
+      setError("Screen sharing was cancelled. Click record and choose “Entire Screen”.");
+      return;
     }
+
+    // Camera is required for this assessment.
+    try {
+      cam = await navigator.mediaDevices.getUserMedia({
+        video: { width: 320, height: 240, facingMode: "user" },
+        audio: false,
+      });
+    } catch {
+      screen.getTracks().forEach((t) => t.stop());
+      setError("Camera access is required. Please allow the camera and try again.");
+      return;
+    }
+
+    screenRef.current = screen;
+    camRef.current = cam;
+
+    // Stopping the share from the browser's own bar ends the recording cleanly.
+    screen.getVideoTracks()[0].addEventListener("ended", () => stop());
+
+    // --- Composite screen + camera onto a canvas ---
+    const screenVideo = document.createElement("video");
+    screenVideo.srcObject = screen;
+    screenVideo.muted = true;
+    await screenVideo.play();
+
+    const camVideo = document.createElement("video");
+    camVideo.srcObject = cam;
+    camVideo.muted = true;
+    await camVideo.play();
+
+    // Cap output size so the file stays reasonable regardless of monitor size.
+    const W = 1280;
+    const H = 720;
+    const canvas = document.createElement("canvas");
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext("2d")!;
+
+    const CAM_W = 240;
+    const CAM_H = 180;
+    const draw = () => {
+      ctx.drawImage(screenVideo, 0, 0, W, H);
+      // Face in the bottom-right, with a subtle border so it reads as a webcam.
+      const x = W - CAM_W - 16;
+      const y = H - CAM_H - 16;
+      ctx.drawImage(camVideo, x, y, CAM_W, CAM_H);
+      ctx.strokeStyle = "rgba(255,255,255,0.85)";
+      ctx.lineWidth = 3;
+      ctx.strokeRect(x, y, CAM_W, CAM_H);
+      rafRef.current = requestAnimationFrame(draw);
+    };
+    draw();
+
+    // Show the candidate a live preview so they can confirm their face is framed.
+    const composite = canvas.captureStream(10);
+    if (previewRef.current) {
+      previewRef.current.srcObject = composite;
+      previewRef.current.play().catch(() => {});
+    }
+
+    const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+      ? "video/webm;codecs=vp9"
+      : "video/webm";
+    const rec = new MediaRecorder(composite, {
+      mimeType: mime,
+      videoBitsPerSecond: 1_500_000,
+    });
+    chunksRef.current = [];
+    rec.ondataavailable = (e) => e.data.size > 0 && chunksRef.current.push(e.data);
+    rec.onstop = upload;
+    rec.start(1000);
+    recorderRef.current = rec;
+
+    setSeconds(0);
+    timerRef.current = setInterval(() => setSeconds((s) => s + 1), 1000);
+    setPhase("recording");
   }
 
   function stop() {
     if (timerRef.current) clearInterval(timerRef.current);
-    recorderRef.current?.state !== "inactive" && recorderRef.current?.stop();
-    streamRef.current?.getTracks().forEach((t) => t.stop());
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    if (recorderRef.current && recorderRef.current.state !== "inactive") {
+      recorderRef.current.stop();
+    }
+    screenRef.current?.getTracks().forEach((t) => t.stop());
+    camRef.current?.getTracks().forEach((t) => t.stop());
   }
 
   async function upload() {
@@ -93,14 +157,12 @@ export function Recorder({
     try {
       const blob = new Blob(chunksRef.current, { type: "video/webm" });
 
-      // Ask the server where to put it (R2 presigned URL, or a local route).
       const target = await fetch(`/api/assess/${token}/upload`).then((r) => r.json());
       if (target.error) throw new Error(target.error);
 
-      // XHR rather than fetch so we get real upload progress.
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhr.open(target.mode === "r2" ? "PUT" : "PUT", target.uploadUrl);
+        xhr.open("PUT", target.uploadUrl);
         xhr.setRequestHeader("Content-Type", "video/webm");
         xhr.upload.onprogress = (e) =>
           e.lengthComputable && setProgress(Math.round((e.loaded / e.total) * 100));
@@ -123,8 +185,8 @@ export function Recorder({
   if (!supported) {
     return (
       <p className="rounded-lg bg-surface-2 px-3 py-2 text-sm text-ink-muted">
-        Your browser can't record the screen here. Use Chrome or Edge on a computer, or
-        record with a separate tool and paste the link below.
+        Your browser can't record here. Use Chrome or Edge on a computer, or record with
+        a separate tool and paste the link below.
       </p>
     );
   }
@@ -133,11 +195,23 @@ export function Recorder({
 
   return (
     <div className="rounded-lg border border-line bg-surface-2 p-4">
-      <p className="text-sm font-medium">Record your screen in the browser</p>
+      <p className="text-sm font-medium">Record your screen and camera</p>
       <p className="mt-1 text-xs text-ink-muted">
         Click record, then choose <strong>Entire Screen</strong> so your Revit window is
-        captured. Recording uploads automatically when you stop.
+        captured, and allow the <strong>camera</strong> when asked. Your face is recorded
+        in the corner so the review team can see you worked unaided. It uploads when you
+        stop.
       </p>
+
+      {/* Live preview while recording, so they can check their framing */}
+      <video
+        ref={previewRef}
+        muted
+        playsInline
+        className={`mt-3 w-full rounded-lg border border-line bg-black ${
+          phase === "recording" ? "" : "hidden"
+        }`}
+      />
 
       <div className="mt-3 flex flex-wrap items-center gap-3">
         {phase === "idle" && (
