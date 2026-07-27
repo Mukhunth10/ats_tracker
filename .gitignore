@@ -45,3 +45,7 @@ dev.db
 dev.db-journal
 *.db
 
+
+# candidate assessment recordings (local storage fallback)
+/uploads/
+!/uploads/.gitkeep

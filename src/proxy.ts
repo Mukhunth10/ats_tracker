@@ -22,8 +22,10 @@ export function proxy(request: NextRequest) {
     pathname.startsWith("/signup") ||
     // Candidates have no account. The assessment page (and its submit action,
     // which POSTs to the same /assess/<token> path) authenticates by the secret
-    // token in the URL, not a session cookie, so it must stay reachable.
+    // token in the URL, not a session cookie, so it must stay reachable. The
+    // recording-upload API under /api/assess/<token> is token-gated the same way.
     pathname.startsWith("/assess") ||
+    pathname.startsWith("/api/assess") ||
     pathname.startsWith("/_next") ||
     pathname === "/favicon.ico"
   ) {

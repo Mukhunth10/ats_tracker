@@ -15,6 +15,9 @@ export interface AssessmentView {
   sentAt: string;
   submittedAt: string | null;
   videoUrl: string;
+  /** True when videoUrl is an in-app/R2 recording we can embed; false for a
+   *  pasted external link, which we only link out to. */
+  videoIsFile: boolean;
   outputUrl: string;
   candidateNote: string;
   qualityScore: number | null;
@@ -99,8 +102,17 @@ export function AssessmentPanel({
               </span>
             )}
           </div>
+          {/* An in-browser recording plays inline; a pasted link opens out. */}
+          {assessment.videoUrl && assessment.videoIsFile && (
+            <video
+              src={assessment.videoUrl}
+              controls
+              preload="metadata"
+              className="w-full rounded-lg border border-line bg-black"
+            />
+          )}
           <div className="flex flex-wrap gap-2">
-            {assessment.videoUrl && (
+            {assessment.videoUrl && !assessment.videoIsFile && (
               <a
                 href={assessment.videoUrl}
                 target="_blank"

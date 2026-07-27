@@ -13,6 +13,24 @@ import { requirePageUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Turns a stored video reference into a URL a reviewer can play.
+ *   local:<key> → the authenticated in-app streaming route
+ *   r2:<key>    → a short-lived presigned GET (URLs never stored stale)
+ *   anything else → a link the candidate pasted; opened externally, not inlined
+ */
+async function resolveVideo(ref: string): Promise<{ url: string; isFile: boolean }> {
+  if (!ref) return { url: "", isFile: false };
+  if (ref.startsWith("local:")) {
+    return { url: `/api/recording/${encodeURIComponent(ref.slice(6))}`, isFile: true };
+  }
+  if (ref.startsWith("r2:")) {
+    const { presignGet } = await import("@/lib/storage");
+    return { url: await presignGet(ref.slice(3)), isFile: true };
+  }
+  return { url: ref, isFile: false };
+}
+
 const RECOMMENDATION_STYLE: Record<string, string> = {
   advance: "bg-emerald-50 text-success ring-emerald-200",
   maybe: "bg-warn-soft text-amber-800 ring-amber-200",
@@ -38,8 +56,11 @@ export default async function ApplicationPage(props: PageProps<"/applications/[i
   if (!app) notFound();
 
   // Shape the assessment for the client panel; dates are pre-formatted on the
-  // server so the panel needn't ship a date library.
+  // server so the panel needn't ship a date library, and the stored video
+  // reference is resolved to something playable here (R2 presign is async and
+  // must run server-side).
   const a = app.assessment;
+  const video = a ? await resolveVideo(a.videoUrl) : { url: "", isFile: false };
   const assessmentView: AssessmentView | null = a
     ? {
         status: a.status as AssessmentView["status"],
@@ -47,7 +68,8 @@ export default async function ApplicationPage(props: PageProps<"/applications/[i
         token: a.token,
         sentAt: a.sentAt.toLocaleString(),
         submittedAt: a.submittedAt?.toLocaleString() ?? null,
-        videoUrl: a.videoUrl,
+        videoUrl: video.url,
+        videoIsFile: video.isFile,
         outputUrl: a.outputUrl,
         candidateNote: a.candidateNote,
         qualityScore: a.qualityScore,
