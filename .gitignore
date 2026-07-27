@@ -49,3 +49,4 @@ dev.db-journal
 # candidate assessment recordings (local storage fallback)
 /uploads/
 !/uploads/.gitkeep
+/.cache/

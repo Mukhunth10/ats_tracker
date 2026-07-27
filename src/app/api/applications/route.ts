@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma, parseJson } from "@/lib/db";
 import { extractText, extractContact } from "@/lib/resume-parse";
-import { scoreByRules } from "@/lib/score-rules";
+import { scoreCandidate } from "@/lib/score-rules";
 import { denyAnonymous } from "@/lib/api-auth";
 
 export const runtime = "nodejs"; // pdf-parse and mammoth need Node APIs
@@ -74,7 +74,7 @@ export async function POST(req: Request) {
     },
   });
 
-  const rules = scoreByRules(text, {
+  const rules = await scoreCandidate(text, {
     mustHave: parseJson<string[]>(job.mustHave, []),
     niceToHave: parseJson<string[]>(job.niceToHave, []),
     customMustHave: parseJson<string[]>(job.customMustHave, []),

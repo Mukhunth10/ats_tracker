@@ -185,6 +185,28 @@ export default async function ApplicationPage(props: PageProps<"/applications/[i
                 </div>
               )}
 
+              {/* Meaning-matches: found by semantic similarity, not exact words.
+                  A softer signal — shown with its evidence for a human to confirm. */}
+              {(rules.semantic?.length ?? 0) > 0 && (
+                <div>
+                  <p className="mb-2 text-xs font-semibold tracking-wide text-primary uppercase">
+                    Matched by meaning — please confirm
+                  </p>
+                  <ul className="space-y-2">
+                    {rules.semantic!.map((k) => (
+                      <li key={k} className="border-l-2 border-primary/40 pl-3 text-sm">
+                        <SkillChip skillKey={k} />
+                        <p className="mt-1 text-ink-muted">{rules.evidence?.[k]}</p>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-2 text-xs text-ink-subtle">
+                    Found by similar meaning, not the exact words — counts for partial
+                    credit. Read the lines above to confirm the skill is really there.
+                  </p>
+                </div>
+              )}
+
               {(rules.listedOnly?.length ?? 0) > 0 && (
                 <div>
                   <p className="mb-2 text-xs font-semibold tracking-wide text-ink-muted uppercase">

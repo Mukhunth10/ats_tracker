@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma, parseJson } from "@/lib/db";
 import { extractText, extractContact } from "@/lib/resume-parse";
 import { redirect } from "next/navigation";
-import { scoreByRules, type JobCriteria } from "@/lib/score-rules";
+import { scoreCandidate, type JobCriteria } from "@/lib/score-rules";
 import { scoreByAi, isAiConfigured } from "@/lib/score-ai";
 import { requireUser } from "@/lib/auth";
 import { deleteStored } from "@/lib/storage";
@@ -195,7 +195,7 @@ export async function uploadResume(
         },
       });
 
-      const rules = scoreByRules(text, criteria);
+      const rules = await scoreCandidate(text, criteria);
 
       const priorApplication = await prisma.application.findUnique({
         where: { jobId_candidateId: { jobId, candidateId: candidate.id } },
@@ -267,7 +267,7 @@ export async function rescoreJob(jobId: string, _prev: ActionState): Promise<Act
   const criteria = criteriaFor(job);
 
   for (const app of job.applications) {
-    const rules = scoreByRules(app.candidate.resumeText, criteria);
+    const rules = await scoreCandidate(app.candidate.resumeText, criteria);
     await prisma.application.update({
       where: { id: app.id },
       data: { ruleScore: rules.score, ruleDetail: JSON.stringify(rules.detail) },

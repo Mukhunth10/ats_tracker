@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Keep the local embedding model out of the bundle — it ships native ONNX
+  // runtime binaries that must load from node_modules at runtime, not be
+  // webpack/turbopack-bundled.
+  serverExternalPackages: ["@huggingface/transformers"],
   experimental: {
     // When the app is reached through a tunnel (for an HR demo) the browser's
     // Origin is the tunnel domain, not localhost. Without these, Next.js rejects

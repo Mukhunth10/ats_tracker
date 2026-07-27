@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma, parseJson } from "@/lib/db";
-import { scoreByRules } from "@/lib/score-rules";
+import { scoreCandidate } from "@/lib/score-rules";
 import { denyAnonymous } from "@/lib/api-auth";
 
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -69,7 +69,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     });
 
     for (const app of applications) {
-      const rules = scoreByRules(app.candidate.resumeText, criteria);
+      const rules = await scoreCandidate(app.candidate.resumeText, criteria);
       await prisma.application.update({
         where: { id: app.id },
         data: { ruleScore: rules.score, ruleDetail: JSON.stringify(rules.detail) },

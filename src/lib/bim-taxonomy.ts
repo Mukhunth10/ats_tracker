@@ -142,6 +142,16 @@ export function labelForKey(key: string): string {
 }
 
 /**
+ * A short natural-language phrase describing a skill, for the semantic matcher
+ * to embed. Richer than the bare label — the aliases add the vocabulary a CV
+ * might actually use — so the meaning is well anchored in vector space.
+ */
+export function semanticPhrase(key: string, label: string, aliases: string[]): string {
+  const extra = aliases.slice(0, 3).join(", ");
+  return extra ? `${label} (${extra})` : label;
+}
+
+/**
  * Verbs that indicate the candidate personally did the work, rather than
  * listing a tool they have been near. This is the core of the "modeller vs
  * developer" distinction the whole product exists to make.
@@ -183,6 +193,17 @@ const PASSIVE_CONTEXT =
   /\b(familiar with|exposure to|assisted|assisting|supported the|knowledge of|awareness of|basic (?:knowledge|understanding)|trained in|learning|coursework|academic exposure)\b/i;
 
 export type Evidence = "demonstrated" | "listed";
+
+/**
+ * Judges whether a line of text demonstrates ownership of work or merely
+ * mentions it — the same test the keyword detector applies, exposed so a
+ * semantically-matched sentence gets scored on the same basis.
+ */
+export function evidenceOf(sentence: string): Evidence {
+  return ACTION_VERBS.test(sentence) && !PASSIVE_CONTEXT.test(sentence)
+    ? "demonstrated"
+    : "listed";
+}
 
 export interface SkillHit {
   key: string;

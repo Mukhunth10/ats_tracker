@@ -101,6 +101,34 @@ harder; raise it toward 1.0 to ignore evidence entirely.
 If AI screening is enabled, its rubric is the `RUBRIC` constant in
 `src/lib/score-ai.ts`, written in plain English.
 
+## Semantic matching (meaning, not just words)
+
+CVs rarely use a role's exact keywords. A candidate who wrote *"coordinated
+mechanical and electrical models and ran interference checks"* should match a
+role needing *"Revit MEP, clash detection"* — same meaning, no shared words.
+
+Three layers handle this, cheapest first:
+
+1. **Keyword + alias** (always on, free, instant) — exact and alias matches.
+2. **Semantic** (`SEMANTIC_MATCHING="on"`, free, offline) — a local embedding
+   model (`SEMANTIC_MODEL`, default `bge-base-en-v1.5`) matches skills the
+   keywords missed *by meaning*. Runs on your machine; downloads the model once
+   (~110MB) on first use. `SEMANTIC_THRESHOLD` tunes strictness.
+3. **Claude AI screening** (paid, opt-in) — the deepest judgement.
+
+Honest limits of the free semantic layer:
+
+- It matches *related concepts*, so it occasionally over-fires ("produced
+  drawings" is genuinely near "AutoCAD"). Because of that, a semantic match is
+  worth **half credit**, never full, and every one is shown to the reviewer
+  under *"Matched by meaning — please confirm"* with the CV line it matched.
+  It's a lead for a human to check, not a decision.
+- It's not RAG. RAG (retrieve-then-generate) is the Claude layer. This is
+  semantic *similarity*, which is the right tool for matching.
+- Fail-open: if the model can't load, scoring silently falls back to keywords.
+- Tune `SEMANTIC_THRESHOLD` and `SEMANTIC_MODEL` against your own CVs. A bigger
+  model separates true matches from loose ones better, at some CPU cost.
+
 ## Privacy and GDPR
 
 > **This provides the technical mechanisms GDPR asks for. It does not make your
