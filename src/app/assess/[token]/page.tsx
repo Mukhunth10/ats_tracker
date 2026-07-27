@@ -1,5 +1,9 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { privacyConfig } from "@/lib/privacy";
+import { isAiConfigured } from "@/lib/score-ai";
+import { isR2Configured } from "@/lib/storage";
+import { PrivacyNotice } from "@/components/privacy-notice";
 import { SubmitForm } from "./submit-form";
 
 // PUBLIC PAGE — no requirePageUser. The token in the URL is the only credential
@@ -19,6 +23,7 @@ export default async function AssessPage(props: PageProps<"/assess/[token]">) {
   if (!assessment) notFound();
 
   const done = assessment.status !== "sent";
+  const cfg = privacyConfig();
 
   return (
     <div className="mx-auto max-w-xl py-4">
@@ -80,10 +85,10 @@ export default async function AssessPage(props: PageProps<"/assess/[token]">) {
         <div className="mt-6 rounded-lg border border-warn-border bg-warn-soft p-4 text-sm text-warn">
           <p className="font-medium">Before you start</p>
           <p className="mt-1 leading-relaxed">
-            Record your screen while you work — free tools: Windows Game Bar (press
-            Win+G), OBS Studio, or Loom. When finished, upload the recording to Google
-            Drive, Loom, or WeTransfer and paste the <strong>share link</strong> below.
-            We time the task from the recording, so please record the whole session.
+            You'll record your screen and camera in the browser while you work. Read the
+            privacy notice below, give your consent, then click record and choose{" "}
+            <strong>Entire Screen</strong> so your Revit window is captured. We time the
+            task from the recording, so please record the whole session.
           </p>
         </div>
 
@@ -93,15 +98,19 @@ export default async function AssessPage(props: PageProps<"/assess/[token]">) {
               This assessment has been reviewed and is now closed. Thank you.
             </p>
           ) : (
-            <SubmitForm
-              token={token}
-              submitted={done}
-              defaults={{
-                videoUrl: assessment.videoUrl,
-                outputUrl: assessment.outputUrl,
-                candidateNote: assessment.candidateNote,
-              }}
-            />
+            <div className="space-y-5">
+              <PrivacyNotice cfg={cfg} aiEnabled={isAiConfigured()} r2Enabled={isR2Configured()} />
+              <SubmitForm
+                token={token}
+                submitted={done}
+                noticeVersion={cfg.noticeVersion}
+                defaults={{
+                  videoUrl: assessment.videoUrl,
+                  outputUrl: assessment.outputUrl,
+                  candidateNote: assessment.candidateNote,
+                }}
+              />
+            </div>
           )}
         </div>
       </div>

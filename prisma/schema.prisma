@@ -138,6 +138,15 @@ model Assessment {
   outputUrl     String @default("")
   candidateNote String @default("")
 
+  // Consent record — the GDPR "demonstrate consent" requirement. Granular:
+  // screen and camera are separate purposes and recorded separately. The notice
+  // version pins which wording the candidate actually agreed to, and consentAt
+  // is when. No IP is stored — data minimisation.
+  consentScreen        Boolean   @default(false)
+  consentCamera        Boolean   @default(false)
+  consentNoticeVersion String    @default("")
+  consentAt            DateTime?
+
   // Reviewer's verdict. quality is the primary ranking key; durationMin is the
   // real working time from the recording and breaks ties between close scores.
   qualityScore Int?

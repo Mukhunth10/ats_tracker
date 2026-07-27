@@ -109,6 +109,29 @@ export async function deleteLocal(key: string): Promise<void> {
   if (p && existsSync(p)) await unlink(p);
 }
 
+async function deleteR2(key: string): Promise<void> {
+  const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");
+  const client = await r2Client();
+  await client.send(
+    new DeleteObjectCommand({ Bucket: process.env.R2_BUCKET!, Key: key }),
+  );
+}
+
+/**
+ * Deletes whatever a stored reference points at — used to honour a candidate's
+ * right to erasure. A plain external link (a pasted URL) is not ours to delete,
+ * so it is left alone. Failures are swallowed: a missing file must not block the
+ * database deletion that actually removes the person's record.
+ */
+export async function deleteStored(ref: string): Promise<void> {
+  try {
+    if (ref.startsWith("local:")) await deleteLocal(ref.slice(6));
+    else if (ref.startsWith("r2:")) await deleteR2(ref.slice(3));
+  } catch {
+    /* best effort */
+  }
+}
+
 /**
  * The value stored in Assessment.videoUrl. For local storage it's an in-app
  * path the authenticated playback route understands; for R2 it's a marker the

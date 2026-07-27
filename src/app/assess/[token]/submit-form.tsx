@@ -8,41 +8,81 @@ import { Recorder } from "./recorder";
 export function SubmitForm({
   token,
   submitted,
+  noticeVersion,
   defaults,
 }: {
   token: string;
   submitted: boolean;
+  noticeVersion: string;
   defaults: { videoUrl: string; outputUrl: string; candidateNote: string };
 }) {
   const action = submitAssessment.bind(null, token);
   const [state, formAction, pending] = useActionState<ActionState, FormData>(action, {});
 
-  // The recording produces a storage reference that goes into the videoUrl
-  // field. The candidate can instead record elsewhere and paste a link.
-  const [consented, setConsented] = useState(false);
+  // Granular consent — screen and camera are separate purposes and ticked
+  // separately (GDPR: consent must not be bundled). The recorder only appears
+  // once both, plus the notice acknowledgement, are given.
+  const [ackNotice, setAckNotice] = useState(false);
+  const [consentScreen, setConsentScreen] = useState(false);
+  const [consentCamera, setConsentCamera] = useState(false);
+  const allConsented = ackNotice && consentScreen && consentCamera;
+
   const [videoUrl, setVideoUrl] = useState(defaults.videoUrl);
   const [recorded, setRecorded] = useState(false);
 
+  const check = "mt-0.5 h-4 w-4 shrink-0 accent-[var(--primary)]";
+
   return (
     <div className="space-y-5">
-      {/* --- Consent gate: recording only appears after informed consent --- */}
-      <div className="rounded-lg border border-line p-4">
+      <div className="space-y-3 rounded-lg border border-line p-4">
+        <p className="text-sm font-medium">Your consent</p>
+
         <label className="flex cursor-pointer items-start gap-2.5">
           <input
             type="checkbox"
-            checked={consented}
-            onChange={(e) => setConsented(e.target.checked)}
-            className="mt-0.5 h-4 w-4 accent-[var(--primary)]"
+            checked={ackNotice}
+            onChange={(e) => setAckNotice(e.target.checked)}
+            className={check}
           />
           <span className="text-sm text-ink">
-            I agree to record my <strong>screen and camera</strong> for this assessment,
-            and to the recording being reviewed by the hiring team. I understand my face
-            is captured while I work and that this is used only to assess this test.
+            I have read the privacy notice above and understand how my data will be used.
           </span>
         </label>
 
-        {consented && (
-          <div className="mt-4">
+        <label className="flex cursor-pointer items-start gap-2.5">
+          <input
+            type="checkbox"
+            checked={consentScreen}
+            onChange={(e) => setConsentScreen(e.target.checked)}
+            className={check}
+          />
+          <span className="text-sm text-ink">
+            I consent to my <strong>screen</strong> being recorded during this assessment.
+          </span>
+        </label>
+
+        <label className="flex cursor-pointer items-start gap-2.5">
+          <input
+            type="checkbox"
+            checked={consentCamera}
+            onChange={(e) => setConsentCamera(e.target.checked)}
+            className={check}
+          />
+          <span className="text-sm text-ink">
+            I consent to my <strong>camera</strong> (my face) being recorded during this
+            assessment and reviewed by the hiring team.
+          </span>
+        </label>
+
+        {!allConsented && (
+          <p className="text-xs text-ink-subtle">
+            Recording becomes available once you have given all three consents above. You
+            are free to decline — see the notice for how to be assessed another way.
+          </p>
+        )}
+
+        {allConsented && (
+          <div className="pt-1">
             <Recorder
               token={token}
               onUploaded={(ref) => {
@@ -55,9 +95,14 @@ export function SubmitForm({
       </div>
 
       <form action={formAction} className="space-y-4">
+        {/* Consent is submitted alongside the work, so it is recorded server-side. */}
+        <input type="hidden" name="consentScreen" value={consentScreen ? "1" : ""} />
+        <input type="hidden" name="consentCamera" value={consentCamera ? "1" : ""} />
+        <input type="hidden" name="noticeVersion" value={noticeVersion} />
+
         <div>
           <label htmlFor="videoUrl" className="mb-1.5 block text-sm font-medium">
-            Screen recording <span className="text-danger">*</span>
+            Screen &amp; camera recording <span className="text-danger">*</span>
           </label>
           <input
             id="videoUrl"
@@ -65,14 +110,14 @@ export function SubmitForm({
             required
             value={videoUrl}
             onChange={(e) => setVideoUrl(e.target.value)}
-            placeholder="Recorded above, or paste a Drive/Loom link"
+            placeholder="Recorded above, or paste a link"
             readOnly={recorded}
             className={`${inputBase} ${recorded ? "bg-surface-2 text-ink-muted" : ""}`}
           />
           <p className="mt-1 text-xs text-ink-subtle">
             {recorded
-              ? "Your in-browser recording is attached."
-              : "Record with the button above, or paste a link set to “anyone with the link can view”."}
+              ? "Your recording is attached."
+              : "Record above after consenting, or paste a link set to “anyone with the link can view”."}
           </p>
         </div>
 

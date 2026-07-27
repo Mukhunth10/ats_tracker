@@ -3,9 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { prisma, parseJson } from "@/lib/db";
 import { extractText, extractContact } from "@/lib/resume-parse";
+import { redirect } from "next/navigation";
 import { scoreByRules, type JobCriteria } from "@/lib/score-rules";
 import { scoreByAi, isAiConfigured } from "@/lib/score-ai";
 import { requireUser } from "@/lib/auth";
+import { deleteStored } from "@/lib/storage";
 
 /** Unpacks a Job row's JSON columns into the shape the scorer expects. */
 function criteriaFor(job: {
@@ -298,6 +300,55 @@ export async function updateJobKeywords(
   });
 
   return rescoreJob(jobId, {});
+}
+
+/**
+ * Right to erasure. Deletes a candidate and everything tied to them —
+ * applications, notes, assessments (all cascade in the database) — plus the
+ * actual recording and test files those assessments referenced, which the
+ * database cascade cannot reach. This is the technical half of a GDPR deletion
+ * request; the organisation still logs and honours the request itself.
+ */
+export async function deleteCandidate(candidateId: string): Promise<void> {
+  await requireUser();
+
+  // Collect stored file references before the cascade removes the rows.
+  const assessments = await prisma.assessment.findMany({
+    where: { application: { candidateId } },
+    select: { videoUrl: true, testUrl: true },
+  });
+
+  for (const a of assessments) {
+    if (a.videoUrl) await deleteStored(a.videoUrl);
+    if (a.testUrl) await deleteStored(a.testUrl);
+  }
+
+  await prisma.candidate.delete({ where: { id: candidateId } });
+
+  revalidatePath("/candidates");
+  redirect("/candidates");
+}
+
+/**
+ * Withdraw consent for a single assessment recording and delete it. Leaves the
+ * rest of the candidate's record intact — the narrower "delete this recording"
+ * a candidate might ask for without wanting to leave the process.
+ */
+export async function deleteRecording(applicationId: string): Promise<void> {
+  await requireUser();
+
+  const a = await prisma.assessment.findUnique({
+    where: { applicationId },
+    select: { videoUrl: true },
+  });
+  if (a?.videoUrl) await deleteStored(a.videoUrl);
+
+  await prisma.assessment.update({
+    where: { applicationId },
+    data: { videoUrl: "", consentScreen: false, consentCamera: false, consentAt: null },
+  });
+
+  revalidatePath(`/applications/${applicationId}`);
 }
 
 /** Create a role from the new-role form. */

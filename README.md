@@ -101,6 +101,46 @@ harder; raise it toward 1.0 to ignore evidence entirely.
 If AI screening is enabled, its rubric is the `RUBRIC` constant in
 `src/lib/score-ai.ts`, written in plain English.
 
+## Privacy and GDPR
+
+> **This provides the technical mechanisms GDPR asks for. It does not make your
+> deployment lawful, and it is not legal advice.** Compliance is mostly
+> organisational — a lawful basis, a DPIA, retention enforcement, and a real
+> person accountable — none of which code can do for you. Have your data
+> protection lead or a lawyer review this before real candidates use it.
+
+What the app does provide:
+
+- **A candidate-facing privacy notice** (`src/components/privacy-notice.tsx`),
+  shown before consent, filled from your details in `.env`:
+  `COMPANY_NAME`, `PRIVACY_CONTACT_EMAIL`, `DATA_RETENTION`,
+  `PRIVACY_NOTICE_VERSION`. Set these to real values — the notice is a legal
+  document.
+- **Granular, unbundled consent** — the candidate consents to screen recording
+  and camera recording *separately*, plus acknowledges the notice. Recording is
+  unavailable until all three are given, and the notice tells them they may
+  decline and be assessed another way.
+- **A consent record** stored on each assessment: which consents were given,
+  which notice version, and when. This is the "demonstrate consent" requirement.
+  No IP is stored — data minimisation.
+- **Right to erasure** — on a candidate's page, *Delete candidate & all data*
+  removes the person and every application, note, assessment **and stored
+  recording/test file** (local or R2). *Delete recording* withdraws consent for
+  just the recording and deletes it, leaving the rest.
+
+What is still yours to do:
+
+- **Choose a lawful basis.** For recruitment, consent is often *not* the right
+  basis (the power imbalance can make it not "freely given"); legitimate
+  interest is common but needs a documented assessment. Decide this with advice.
+- **Run a DPIA.** Camera monitoring of candidates is exactly the high-risk
+  processing that makes a Data Protection Impact Assessment **legally required**
+  under Article 35. Do it before you switch the camera on for real.
+- **Enforce retention.** The notice states a period; you must actually delete
+  data when it expires. Nothing here does that automatically yet.
+- **Appoint a contact** and monitor the `PRIVACY_CONTACT_EMAIL` inbox for access,
+  deletion, and withdrawal requests.
+
 ## Deploying to Postgres
 
 The schema deliberately avoids enums and array columns so the same models run on

@@ -9,6 +9,7 @@ import { StageSelect } from "@/components/stage-select";
 import { ScreenButton } from "@/components/screen-button";
 import { NoteForm } from "@/components/note-form";
 import { AssessmentPanel, type AssessmentView } from "@/components/assessment-panel";
+import { DangerActions } from "@/components/danger-actions";
 import { requirePageUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -70,6 +71,10 @@ export default async function ApplicationPage(props: PageProps<"/applications/[i
         submittedAt: a.submittedAt?.toLocaleString() ?? null,
         videoUrl: video.url,
         videoIsFile: video.isFile,
+        consentAt: a.consentAt?.toLocaleString() ?? null,
+        consentScreen: a.consentScreen,
+        consentCamera: a.consentCamera,
+        consentNoticeVersion: a.consentNoticeVersion,
         outputUrl: a.outputUrl,
         candidateNote: a.candidateNote,
         qualityScore: a.qualityScore,
@@ -327,6 +332,22 @@ export default async function ApplicationPage(props: PageProps<"/applications/[i
                   ))}
                 </ul>
               )}
+            </Card>
+          </div>
+
+          <div>
+            <SectionTitle>Data &amp; privacy</SectionTitle>
+            <Card className="p-4">
+              <DangerActions
+                candidateId={app.candidateId}
+                candidateName={app.candidate.name}
+                applicationId={app.id}
+                hasRecording={Boolean(a?.videoUrl)}
+              />
+              <p className="mt-3 border-t border-line pt-3 text-xs text-ink-subtle">
+                Use these to honour a candidate's request to withdraw consent or delete
+                their data. Deletion is permanent and removes their recordings too.
+              </p>
             </Card>
           </div>
         </div>

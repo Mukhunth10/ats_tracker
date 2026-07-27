@@ -35,6 +35,11 @@ export interface AssessmentView {
   /** True when videoUrl is an in-app/R2 recording we can embed; false for a
    *  pasted external link, which we only link out to. */
   videoIsFile: boolean;
+  /** Consent record — proof of what the candidate agreed to. */
+  consentAt: string | null;
+  consentScreen: boolean;
+  consentCamera: boolean;
+  consentNoticeVersion: string;
   outputUrl: string;
   candidateNote: string;
   qualityScore: number | null;
@@ -154,6 +159,14 @@ export function AssessmentPanel({
             <p className="text-sm text-ink-muted">
               <span className="font-medium text-ink">Candidate note: </span>
               {assessment.candidateNote}
+            </p>
+          )}
+          {assessment.consentAt && (
+            <p className="border-t border-line pt-2 text-xs text-ink-subtle">
+              Consent recorded {assessment.consentAt} — screen:{" "}
+              {assessment.consentScreen ? "yes" : "no"}, camera:{" "}
+              {assessment.consentCamera ? "yes" : "no"} (notice v
+              {assessment.consentNoticeVersion || "?"}).
             </p>
           )}
         </div>

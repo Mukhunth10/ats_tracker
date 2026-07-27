@@ -94,9 +94,18 @@ export async function submitAssessment(
   const videoUrl = String(formData.get("videoUrl") ?? "").trim();
   const outputUrl = String(formData.get("outputUrl") ?? "").trim();
   const candidateNote = String(formData.get("candidateNote") ?? "").trim();
+  const consentScreen = formData.get("consentScreen") === "1";
+  const consentCamera = formData.get("consentCamera") === "1";
+  const noticeVersion = String(formData.get("noticeVersion") ?? "").trim();
+
+  // A recording without recorded consent must not be accepted — that's the
+  // whole point of capturing it.
+  if (videoUrl && (!consentScreen || !consentCamera)) {
+    return { error: "Please give consent for screen and camera recording before submitting." };
+  }
 
   if (!videoUrl) {
-    return { error: "Paste the share link to your screen recording." };
+    return { error: "Record your screen and camera above, or paste a link." };
   }
   if (!looksLikeUrl(videoUrl)) {
     return { error: "The recording link doesn't look like a URL (needs http:// or https://)." };
@@ -115,6 +124,11 @@ export async function submitAssessment(
       // Only stamp the submit time on the first submission, so re-submitting to
       // fix a broken link doesn't inflate the elapsed time.
       submittedAt: assessment.submittedAt ?? new Date(),
+      // Persist the consent record: what was agreed, which notice version, when.
+      consentScreen,
+      consentCamera,
+      consentNoticeVersion: noticeVersion,
+      consentAt: assessment.consentAt ?? new Date(),
     },
   });
 
