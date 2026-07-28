@@ -4,9 +4,14 @@ import { revalidatePath } from "next/cache";
 import { prisma, parseJson } from "@/lib/db";
 import { extractText, extractContact } from "@/lib/resume-parse";
 import { redirect } from "next/navigation";
-import { scoreCandidate, type JobCriteria } from "@/lib/score-rules";
+import { scoreCandidate, type JobCriteria, type RuleDetail } from "@/lib/score-rules";
 import { scoreByAi, isAiConfigured } from "@/lib/score-ai";
-import { scoreByLocalAi, localAiConfigured, localAiAvailable } from "@/lib/score-local";
+import {
+  scoreByLocalAi,
+  localAiConfigured,
+  localAiAvailable,
+  type RuleSignals,
+} from "@/lib/score-local";
 import { requireUser } from "@/lib/auth";
 import { deleteStored } from "@/lib/storage";
 import { logActivity } from "@/lib/activity";
@@ -145,10 +150,22 @@ async function runScreen(applicationId: string): Promise<ActionState> {
     };
   }
 
+  // Hand the local model the rule-based evidence already computed for this
+  // application, so it corroborates real signals instead of starting cold.
+  const rd = parseJson<Partial<RuleDetail>>(app.ruleDetail, {});
+  const signals: RuleSignals = {
+    yearsDetected: rd.yearsDetected,
+    yearsRequired: rd.yearsRequired ?? app.job.minYears,
+    demonstrated: rd.demonstrated,
+    listedOnly: rd.listedOnly,
+    missingMustHave: rd.missingMustHave,
+    semantic: rd.semantic,
+  };
+
   const provider = useLocal ? "local" : "Claude";
   try {
     const result = useLocal
-      ? await scoreByLocalAi(app.candidate.resumeText, jobArg)
+      ? await scoreByLocalAi(app.candidate.resumeText, jobArg, signals)
       : await scoreByAi(app.candidate.resumeText, jobArg);
 
     await prisma.application.update({

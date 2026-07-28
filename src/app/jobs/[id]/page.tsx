@@ -12,6 +12,7 @@ import { KeywordEditor } from "@/components/keyword-editor";
 import { LiveJob } from "@/components/live-job";
 import { ActivityTimeline } from "@/components/activity-timeline";
 import { requirePageUser } from "@/lib/auth";
+import { extractFacets } from "@/lib/cv-facets";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +70,9 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
   // can match any word in the CV, not just the candidate's name.
   const rows: FilterRow[] = ranked.map((app) => {
     const detail = parseJson<Partial<RuleDetail>>(app.ruleDetail, {});
+    // Work authorisation and degree read off the CV text — hints for the
+    // recruiter to filter and then verify, never an automated gate.
+    const facets = extractFacets(app.candidate.resumeText);
     return {
       id: app.id,
       name: app.candidate.name,
@@ -84,6 +88,9 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
       // one has no result yet.
       assessScore: app.assessment?.status === "reviewed" ? app.assessment.qualityScore : null,
       assessMin: app.assessment?.status === "reviewed" ? app.assessment.durationMin : null,
+      workAuth: facets.workAuth,
+      degree: facets.degree,
+      location: app.candidate.location ?? null,
       haystack: app.candidate.resumeText.toLowerCase(),
     };
   });

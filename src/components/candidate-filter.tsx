@@ -4,6 +4,13 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { ScoreRing, SkillChip, STAGES, inputBase } from "./ui";
 import { StageSelect } from "./stage-select";
+import {
+  DEGREE_RANK,
+  DEGREE_LABEL,
+  WORK_AUTH_LABEL,
+  type WorkAuth,
+  type DegreeLevel,
+} from "@/lib/cv-facets";
 
 export interface FilterRow {
   id: string;
@@ -21,6 +28,11 @@ export interface FilterRow {
   /** Assessment result, when one has been reviewed. */
   assessScore?: number | null;
   assessMin?: number | null;
+  /** Work authorisation + degree, detected from the CV (hints, not verified). */
+  workAuth?: WorkAuth;
+  degree?: DegreeLevel;
+  /** Candidate location, when known — used by the location filter. */
+  location?: string | null;
   /** Lowercased resume text, for keyword search. */
   haystack: string;
 }
@@ -47,6 +59,9 @@ export function CandidateFilter({
   const [source, setSource] = useState("all");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("score");
+  const [workAuth, setWorkAuth] = useState("all"); // all | right | sponsor | unknown
+  const [minDegree, setMinDegree] = useState("all"); // all | bachelor | master | phd
+  const [location, setLocation] = useState("");
 
   const sources = useMemo(
     () =>
@@ -62,10 +77,23 @@ export function CandidateFilter({
     // Space-separated terms are ANDed, so "revit primavera" finds CVs with both.
     const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
 
+    const loc = location.trim().toLowerCase();
+
     const result = rows.filter((r) => {
       if ((r.aiScore ?? r.ruleScore) < minScore) return false;
       if (stage !== "all" && r.stage !== stage) return false;
       if (source !== "all" && !(r.source ?? "direct").includes(source)) return false;
+      if (workAuth !== "all" && (r.workAuth ?? "unknown") !== workAuth) return false;
+      if (minDegree !== "all") {
+        const rank = DEGREE_RANK[r.degree ?? "none"];
+        if (rank < DEGREE_RANK[minDegree as DegreeLevel]) return false;
+      }
+      if (loc) {
+        // Match the candidate's location field first, then fall back to any
+        // mention of the place in the CV body.
+        const where = `${r.location ?? ""} ${r.haystack}`.toLowerCase();
+        if (!where.includes(loc)) return false;
+      }
       if (terms.length > 0) {
         const hay = `${r.name} ${r.email} ${r.haystack}`.toLowerCase();
         if (!terms.every((t) => hay.includes(t))) return false;
@@ -87,12 +115,29 @@ export function CandidateFilter({
       }
       return (b.aiScore ?? b.ruleScore) - (a.aiScore ?? a.ruleScore);
     });
-  }, [rows, minScore, stage, source, query, sort]);
+  }, [rows, minScore, stage, source, query, sort, workAuth, minDegree, location]);
 
   const control =
     "rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink transition-colors duration-150 focus:border-primary focus:outline-none";
 
-  const hasFilters = minScore > 0 || stage !== "all" || source !== "all" || query !== "";
+  const hasFilters =
+    minScore > 0 ||
+    stage !== "all" ||
+    source !== "all" ||
+    query !== "" ||
+    workAuth !== "all" ||
+    minDegree !== "all" ||
+    location !== "";
+
+  const clearAll = () => {
+    setMinScore(0);
+    setStage("all");
+    setSource("all");
+    setQuery("");
+    setWorkAuth("all");
+    setMinDegree("all");
+    setLocation("");
+  };
 
   return (
     <div className="space-y-3">
@@ -184,12 +229,7 @@ export function CandidateFilter({
 
           {hasFilters && (
             <button
-              onClick={() => {
-                setMinScore(0);
-                setStage("all");
-                setSource("all");
-                setQuery("");
-              }}
+              onClick={clearAll}
               className="rounded-lg px-2.5 py-1.5 text-sm text-ink-muted transition-colors hover:bg-surface-hover hover:text-ink"
             >
               Clear
@@ -198,6 +238,55 @@ export function CandidateFilter({
 
           <span className="tabular ml-auto text-sm text-ink-muted">
             {filtered.length} of {rows.length}
+          </span>
+        </div>
+
+        {/* Second row: recruiter facets — work authorisation, degree, location.
+            Read from the CV text as hints; verify before acting on them. */}
+        <div className="mt-2.5 flex flex-wrap items-center gap-2.5 border-t border-line pt-2.5">
+          <label className="flex items-center gap-1.5 text-sm">
+            <span className="text-ink-muted">Work auth</span>
+            <select
+              value={workAuth}
+              onChange={(e) => setWorkAuth(e.target.value)}
+              aria-label="Filter by work authorisation"
+              className={control}
+            >
+              <option value="all">Any</option>
+              <option value="right">Right to work</option>
+              <option value="sponsor">Needs sponsorship</option>
+              <option value="unknown">Not stated</option>
+            </select>
+          </label>
+
+          <label className="flex items-center gap-1.5 text-sm">
+            <span className="text-ink-muted">Degree</span>
+            <select
+              value={minDegree}
+              onChange={(e) => setMinDegree(e.target.value)}
+              aria-label="Filter by minimum degree"
+              className={control}
+            >
+              <option value="all">Any</option>
+              <option value="bachelor">Bachelor’s or higher</option>
+              <option value="master">Master’s or higher</option>
+              <option value="phd">PhD</option>
+            </select>
+          </label>
+
+          <label className="flex items-center gap-1.5 text-sm">
+            <span className="text-ink-muted">Location</span>
+            <input
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="e.g. Dublin"
+              aria-label="Filter by location"
+              className={`${control} w-32`}
+            />
+          </label>
+
+          <span className="text-xs text-ink-subtle">
+            Detected from the CV — verify before relying on it.
           </span>
         </div>
       </div>
@@ -243,7 +332,35 @@ export function CandidateFilter({
                       <span className="tabular text-success">
                         {r.proven} proven
                       </span>
+                      {r.location && (
+                        <>
+                          <span aria-hidden className="text-ink-subtle">·</span>
+                          <span className="truncate text-ink-muted">{r.location}</span>
+                        </>
+                      )}
                     </p>
+
+                    {/* Facet badges — work authorisation and degree, read off the
+                        CV. Neutral styling: these are hints, not verdicts. */}
+                    {(r.workAuth && r.workAuth !== "unknown") || (r.degree && r.degree !== "none") ? (
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                        {r.workAuth === "right" && (
+                          <span className="rounded-md bg-success-soft px-1.5 py-0.5 text-2xs font-medium text-success ring-1 ring-success-border ring-inset">
+                            {WORK_AUTH_LABEL.right}
+                          </span>
+                        )}
+                        {r.workAuth === "sponsor" && (
+                          <span className="rounded-md bg-warn-soft px-1.5 py-0.5 text-2xs font-medium text-warn ring-1 ring-warn-border ring-inset">
+                            {WORK_AUTH_LABEL.sponsor}
+                          </span>
+                        )}
+                        {r.degree && r.degree !== "none" && (
+                          <span className="rounded-md bg-surface-2 px-1.5 py-0.5 text-2xs font-medium text-ink-muted ring-1 ring-line ring-inset">
+                            {DEGREE_LABEL[r.degree]}
+                          </span>
+                        )}
+                      </div>
+                    ) : null}
 
                     {r.missing.length > 0 && (
                       <div className="mt-1.5 flex flex-wrap items-center gap-1">
