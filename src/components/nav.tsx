@@ -3,21 +3,23 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const LINKS = [
-  { href: "/", label: "Dashboard" },
-  { href: "/candidates", label: "Candidates" },
-];
-
 /**
  * Current location must be visibly marked, not merely implied — otherwise
  * people lose track of where they are in a multi-page tool.
  */
-export function Nav() {
+export function Nav({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname();
+
+  const links = [
+    { href: "/", label: "Dashboard" },
+    { href: "/candidates", label: "Candidates" },
+    ...(isAdmin ? [{ href: "/admin/users", label: "Team" }] : []),
+    { href: "/settings", label: "Settings" },
+  ];
 
   return (
     <nav className="flex gap-1" aria-label="Main">
-      {LINKS.map((link) => {
+      {links.map((link) => {
         const active =
           link.href === "/"
             ? pathname === "/" || pathname.startsWith("/jobs")

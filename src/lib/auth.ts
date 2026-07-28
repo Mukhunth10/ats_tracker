@@ -84,6 +84,13 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     return null;
   }
 
+  // A disabled account is treated as signed-out, and its sessions are cleared so
+  // an admin disabling someone takes effect on their next request.
+  if (session.user.disabled) {
+    await prisma.session.deleteMany({ where: { userId: session.user.id } }).catch(() => {});
+    return null;
+  }
+
   return {
     id: session.user.id,
     email: session.user.email,
@@ -127,5 +134,19 @@ export async function requireUser(): Promise<SessionUser> {
 export async function requirePageUser(): Promise<SessionUser> {
   const user = await getSessionUser();
   if (!user) redirect("/login");
+  return user;
+}
+
+/** Server-Action/API admin guard. Throws for non-admins (fails closed). */
+export async function requireAdmin(): Promise<SessionUser> {
+  const user = await requireUser();
+  if (user.role !== "admin") throw new Error("Admins only");
+  return user;
+}
+
+/** Page admin guard. Sends non-admins back to the dashboard rather than 500. */
+export async function requirePageAdmin(): Promise<SessionUser> {
+  const user = await requirePageUser();
+  if (user.role !== "admin") redirect("/");
   return user;
 }

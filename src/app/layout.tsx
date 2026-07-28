@@ -65,7 +65,7 @@ export default async function RootLayout({
               </span>
             </Link>
 
-            {user && <Nav />}
+            {user && <Nav isAdmin={user.role === "admin"} />}
 
             {user && (
               <div className="ml-auto flex shrink-0 items-center gap-2">

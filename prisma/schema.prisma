@@ -20,6 +20,9 @@ model User {
   /// scrypt hash as "salt:derivedKey". Never store or log the raw password.
   passwordHash String
   role         String   @default("recruiter") // admin | recruiter
+  /// A disabled user cannot log in and their sessions are revoked. We disable
+  /// rather than delete so the audit trail and notes keep their author.
+  disabled     Boolean  @default(false)
   createdAt    DateTime @default(now())
 
   sessions Session[]

@@ -39,13 +39,17 @@ export async function signup(_prev: SignupState, formData: FormData): Promise<Si
     return { error: "An account with that email already exists — sign in instead." };
   }
 
+  // The very first account to be created is the admin — so there's always
+  // someone who can manage users and reset passwords. Everyone after is a
+  // recruiter (an admin can promote them later).
+  const isFirstUser = (await prisma.user.count()) === 0;
+
   const user = await prisma.user.create({
     data: {
       name,
       email,
       passwordHash: await hashPassword(password),
-      // Self-registered users are recruiters. Admins are made from the CLI.
-      role: "recruiter",
+      role: isFirstUser ? "admin" : "recruiter",
     },
   });
 
