@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma, parseJson } from "@/lib/db";
 import { extractText, extractContact } from "@/lib/resume-parse";
 import { redirect } from "next/navigation";
-import { scoreCandidate, type JobCriteria, type RuleDetail } from "@/lib/score-rules";
+import { scoreByRules, type JobCriteria, type RuleDetail } from "@/lib/score-rules";
 import { scoreByAi, isAiConfigured } from "@/lib/score-ai";
 import {
   scoreByLocalAi,
@@ -219,11 +219,18 @@ export async function screenJob(jobId: string, _prev: ActionState): Promise<Acti
     return { error: "No AI screener available. Run Ollama locally, or set ANTHROPIC_API_KEY." };
   }
 
+  // The LLM writes a paragraph per candidate — seconds each — so it is a
+  // shortlist tool, never a "run on all 500" button. We deep-screen only the
+  // top of the ranking (by the instant score); everyone else stays filterable
+  // by their evidence score, and any individual can still be screened by hand.
+  const SHORTLIST_CAP = 15;
   const pending = await prisma.application.findMany({
     where: { jobId, aiScore: null },
     select: { id: true },
+    orderBy: { ruleScore: "desc" },
+    take: SHORTLIST_CAP,
   });
-  if (pending.length === 0) return { ok: "Everyone on this role is already screened." };
+  if (pending.length === 0) return { ok: "The top candidates on this role are already screened." };
 
   let done = 0;
   let failed = 0;
@@ -235,7 +242,9 @@ export async function screenJob(jobId: string, _prev: ActionState): Promise<Acti
 
   revalidatePath(`/jobs/${jobId}`);
   return {
-    ok: `Screened ${done} candidate${done === 1 ? "" : "s"}${failed ? `, ${failed} failed` : ""}.`,
+    ok: `Deep-screened the top ${done} candidate${done === 1 ? "" : "s"} by score${
+      failed ? `, ${failed} failed` : ""
+    }.`,
   };
 }
 
@@ -309,7 +318,11 @@ export async function uploadResume(
         },
       });
 
-      const rules = await scoreCandidate(text, criteria);
+      // Bulk intake uses the INSTANT evidence+keyword scorer (no embeddings, no
+      // LLM), so 500 CVs rank in the time they take to parse. Semantic and the
+      // LLM verdict are deep-dive tools you run on the shortlist afterwards, not
+      // on every applicant.
+      const rules = scoreByRules(text, criteria);
 
       const priorApplication = await prisma.application.findUnique({
         where: { jobId_candidateId: { jobId, candidateId: candidate.id } },
@@ -390,8 +403,10 @@ export async function rescoreJob(jobId: string, _prev: ActionState): Promise<Act
 
   const criteria = criteriaFor(job);
 
+  // Instant scorer, so re-ranking a whole role (even hundreds of CVs) against
+  // edited keywords is immediate.
   for (const app of job.applications) {
-    const rules = await scoreCandidate(app.candidate.resumeText, criteria);
+    const rules = scoreByRules(app.candidate.resumeText, criteria);
     await prisma.application.update({
       where: { id: app.id },
       data: { ruleScore: rules.score, ruleDetail: JSON.stringify(rules.detail) },
