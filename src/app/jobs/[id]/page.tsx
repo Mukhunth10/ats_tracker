@@ -11,6 +11,7 @@ import { UploadResume } from "@/components/upload-resume";
 import { KeywordEditor } from "@/components/keyword-editor";
 import { LiveJob } from "@/components/live-job";
 import { ActivityTimeline } from "@/components/activity-timeline";
+import { ApplyLinkPanel } from "@/components/apply-link";
 import { requirePageUser } from "@/lib/auth";
 import { extractFacets } from "@/lib/cv-facets";
 
@@ -221,6 +222,13 @@ export default async function JobPage(props: PageProps<"/jobs/[id]">) {
             <SectionTitle>Add candidates</SectionTitle>
             <Card className="p-4">
               <UploadResume jobId={job.id} />
+            </Card>
+          </div>
+
+          <div>
+            <SectionTitle>Public apply link</SectionTitle>
+            <Card className="p-4">
+              <ApplyLinkPanel jobId={job.id} token={job.applyToken} open={job.applyOpen} />
             </Card>
           </div>
 

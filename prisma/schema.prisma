@@ -61,6 +61,13 @@ model Job {
   minYears  Int      @default(0)
   status    String   @default("open") // open | paused | closed
   description String  @default("")
+
+  // Public "Apply" page: candidates upload their own CV via this secret token in
+  // the URL (/apply/<applyToken>). applyOpen lets a recruiter stop accepting
+  // applications without deleting the link.
+  applyToken String  @unique @default(cuid())
+  applyOpen  Boolean @default(true)
+
   createdAt DateTime @default(now())
 
   applications Application[]

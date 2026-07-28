@@ -26,6 +26,11 @@ export function proxy(request: NextRequest) {
     // recording-upload API under /api/assess/<token> is token-gated the same way.
     pathname.startsWith("/assess") ||
     pathname.startsWith("/api/assess") ||
+    // Public "Apply" page: candidates upload their CV via a per-role token in
+    // the URL. The submit action POSTs to this same /apply/<token> path, so it
+    // must stay reachable without a session.
+    pathname.startsWith("/apply") ||
+    pathname.startsWith("/api/apply") ||
     pathname.startsWith("/_next") ||
     pathname === "/favicon.ico"
   ) {

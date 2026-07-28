@@ -33,6 +33,8 @@ CREATE TABLE "Job" (
     "minYears" INTEGER NOT NULL DEFAULT 0,
     "status" TEXT NOT NULL DEFAULT 'open',
     "description" TEXT NOT NULL DEFAULT '',
+    "applyToken" TEXT NOT NULL,
+    "applyOpen" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -132,6 +134,9 @@ CREATE UNIQUE INDEX "Session_token_key" ON "Session"("token");
 
 -- CreateIndex
 CREATE INDEX "Session_userId_idx" ON "Session"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Job_applyToken_key" ON "Job"("applyToken");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Candidate_email_key" ON "Candidate"("email");

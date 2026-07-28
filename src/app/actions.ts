@@ -491,6 +491,15 @@ export async function deleteRecording(applicationId: string): Promise<void> {
 }
 
 /** Create a role from the new-role form. */
+/** Open or close public applications for a role (the /apply link keeps working
+ *  but rejects submissions when closed). */
+export async function setApplyOpen(jobId: string, open: boolean): Promise<ActionState> {
+  await requireUser();
+  await prisma.job.update({ where: { id: jobId }, data: { applyOpen: open } });
+  revalidatePath(`/jobs/${jobId}`);
+  return { ok: open ? "Applications opened." : "Applications closed." };
+}
+
 export async function createJob(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireUser();
 
