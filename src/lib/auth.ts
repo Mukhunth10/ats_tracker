@@ -13,7 +13,10 @@ const scryptAsync = promisify(scrypt) as (
 ) => Promise<Buffer>;
 
 export const SESSION_COOKIE = "ats_session";
-const SESSION_DAYS = 7;
+// Long-lived so staff sign in once and then just open the app — the cookie is
+// persistent (survives closing the browser). Sign out (or an admin disabling the
+// account) revokes it immediately. Shorten this if you want tighter re-auth.
+const SESSION_DAYS = 30;
 
 /**
  * scrypt from Node's standard library — deliberately chosen over bcrypt/argon2
