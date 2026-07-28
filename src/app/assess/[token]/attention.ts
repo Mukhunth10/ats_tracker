@@ -22,11 +22,14 @@
 
 const SAMPLE_MS = 400; // how often to run detection (not every frame — costly)
 const AWAY_GRACE_MS = 3000; // must look away this long before it counts
+const MULTI_GRACE_MS = 1500; // a second face must persist this long before it counts
 const YAW_THRESHOLD = 0.42; // nose-offset ratio beyond which the head is "turned"
 
 export interface AttentionStats {
   awaySec: number;
   events: number;
+  /** Distinct sustained periods where a second face was visible in frame. */
+  multiFaceEvents: number;
 }
 
 export interface AttentionMonitor {
@@ -36,11 +39,14 @@ export interface AttentionMonitor {
 /**
  * Starts monitoring `video`. `onWarn(active)` is called when a sustained
  * look-away begins (true) and ends (false) so the UI can show/hide a warning.
- * Returns a handle whose stop() yields the accumulated stats.
+ * `onEvent` (optional) fires once per sustained look-away or multi-face run, so
+ * a proctor timeline can record when it happened. Returns a handle whose stop()
+ * yields the accumulated stats.
  */
 export async function startAttentionMonitor(
   video: HTMLVideoElement,
   onWarn: (active: boolean) => void,
+  onEvent?: (type: "look_away" | "multi_face") => void,
 ): Promise<AttentionMonitor> {
   let landmarker: import("@mediapipe/tasks-vision").FaceLandmarker | null = null;
 
@@ -56,17 +62,21 @@ export async function startAttentionMonitor(
         delegate: "GPU",
       },
       runningMode: "VIDEO",
-      numFaces: 1,
+      // Look for up to two faces so a second person in frame can be flagged.
+      numFaces: 2,
     });
   } catch {
     // Model couldn't load — monitoring is unavailable, but recording goes on.
-    return { stop: () => ({ awaySec: 0, events: 0 }) };
+    return { stop: () => ({ awaySec: 0, events: 0, multiFaceEvents: 0 }) };
   }
 
   let events = 0;
   let awayMs = 0;
   let awaySinceMonotonic: number | null = null; // when the current away-run began
   let warnedThisRun = false;
+  let multiFaceEvents = 0;
+  let multiSinceMonotonic: number | null = null; // when the current 2-face run began
+  let countedThisMultiRun = false;
   let lastTick = performance.now();
   let stopped = false;
 
@@ -97,6 +107,7 @@ export async function startAttentionMonitor(
       // detectForVideo needs monotonically increasing timestamps.
       const result = landmarker.detectForVideo(video, now);
       const facing = isFacingForward(result);
+      const faceCount = result.faceLandmarks?.length ?? 0;
 
       if (facing) {
         // Back on task — close any open away-run and clear the warning.
@@ -113,8 +124,23 @@ export async function startAttentionMonitor(
             events += 1;
             warnedThisRun = true;
             onWarn(true);
+            onEvent?.("look_away");
           }
         }
+      }
+
+      // A second face in frame, sustained past the grace window, is worth one
+      // flag per appearance — someone else helping or taking the test.
+      if (faceCount >= 2) {
+        if (multiSinceMonotonic === null) multiSinceMonotonic = now;
+        if (now - multiSinceMonotonic >= MULTI_GRACE_MS && !countedThisMultiRun) {
+          multiFaceEvents += 1;
+          countedThisMultiRun = true;
+          onEvent?.("multi_face");
+        }
+      } else {
+        multiSinceMonotonic = null;
+        countedThisMultiRun = false;
       }
     } catch {
       /* a bad frame — ignore, keep going */
@@ -135,7 +161,7 @@ export async function startAttentionMonitor(
         /* ignore */
       }
       onWarn(false);
-      return { awaySec: Math.round(awayMs / 1000), events };
+      return { awaySec: Math.round(awayMs / 1000), events, multiFaceEvents };
     },
   };
 }

@@ -4,6 +4,19 @@ import { useActionState, useState } from "react";
 import { submitAssessment, type ActionState } from "@/app/assessments/actions";
 import { btnPrimary, inputBase } from "@/components/ui";
 import { Recorder } from "./recorder";
+import type { AssessmentSignals } from "./proctor";
+
+const EMPTY_SIGNALS: AssessmentSignals = {
+  awaySec: 0,
+  events: 0,
+  tabHiddenSec: 0,
+  tabSwitches: 0,
+  pastes: 0,
+  copies: 0,
+  fullscreenExits: 0,
+  multiFace: 0,
+  timeline: [],
+};
 
 export function SubmitForm({
   token,
@@ -29,7 +42,7 @@ export function SubmitForm({
 
   const [videoUrl, setVideoUrl] = useState(defaults.videoUrl);
   const [recorded, setRecorded] = useState(false);
-  const [attention, setAttention] = useState({ awaySec: 0, events: 0 });
+  const [signals, setSignals] = useState<AssessmentSignals>(EMPTY_SIGNALS);
 
   const check = "mt-0.5 h-4 w-4 shrink-0 accent-[var(--primary)]";
 
@@ -89,7 +102,7 @@ export function SubmitForm({
               onUploaded={(ref, stats) => {
                 setVideoUrl(ref);
                 setRecorded(true);
-                setAttention(stats);
+                setSignals(stats);
               }}
             />
           </div>
@@ -101,8 +114,15 @@ export function SubmitForm({
         <input type="hidden" name="consentScreen" value={consentScreen ? "1" : ""} />
         <input type="hidden" name="consentCamera" value={consentCamera ? "1" : ""} />
         <input type="hidden" name="noticeVersion" value={noticeVersion} />
-        <input type="hidden" name="attentionAwaySec" value={attention.awaySec} />
-        <input type="hidden" name="attentionEvents" value={attention.events} />
+        <input type="hidden" name="attentionAwaySec" value={signals.awaySec} />
+        <input type="hidden" name="attentionEvents" value={signals.events} />
+        <input type="hidden" name="proctorTabHiddenSec" value={signals.tabHiddenSec} />
+        <input type="hidden" name="proctorTabSwitches" value={signals.tabSwitches} />
+        <input type="hidden" name="proctorPastes" value={signals.pastes} />
+        <input type="hidden" name="proctorCopies" value={signals.copies} />
+        <input type="hidden" name="proctorFullscreenExits" value={signals.fullscreenExits} />
+        <input type="hidden" name="proctorMultiFace" value={signals.multiFace} />
+        <input type="hidden" name="proctorLog" value={JSON.stringify(signals.timeline)} />
 
         <div>
           <label htmlFor="videoUrl" className="mb-1.5 block text-sm font-medium">

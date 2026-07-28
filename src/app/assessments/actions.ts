@@ -8,6 +8,48 @@ import { logActivity } from "@/lib/activity";
 
 export type ActionState = { error?: string; ok?: string };
 
+/** Non-negative integer from a form field. */
+function intField(fd: FormData, name: string): number {
+  return Math.max(0, Math.round(Number(fd.get(name)) || 0));
+}
+
+const PROCTOR_EVENT_TYPES = new Set([
+  "tab_hidden",
+  "tab_visible",
+  "paste",
+  "copy",
+  "fullscreen_exit",
+  "look_away",
+  "multi_face",
+]);
+
+/**
+ * The proctor timeline arrives as JSON from the (untrusted) candidate page, so
+ * we validate it: keep only well-formed {t, type} events with a known type,
+ * clamp the timestamp, and cap the length. Anything odd becomes an empty log
+ * rather than being stored verbatim.
+ */
+function sanitizeLog(raw: FormDataEntryValue | null): string {
+  if (typeof raw !== "string" || raw.length > 40_000) return "[]";
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return "[]";
+    const clean = parsed
+      .filter(
+        (e) =>
+          e &&
+          typeof e === "object" &&
+          PROCTOR_EVENT_TYPES.has(e.type) &&
+          Number.isFinite(Number(e.t)),
+      )
+      .slice(0, 600)
+      .map((e) => ({ t: Math.max(0, Math.round(Number(e.t))), type: String(e.type) }));
+    return JSON.stringify(clean);
+  } catch {
+    return "[]";
+  }
+}
+
 /** Best-effort URL sanity check so a pasted "drive.google..." typo is caught early. */
 function looksLikeUrl(s: string): boolean {
   try {
@@ -143,6 +185,14 @@ export async function submitAssessment(
       // Attention monitoring result (a reviewer aid, computed client-side).
       attentionAwaySec: Math.max(0, Math.round(Number(formData.get("attentionAwaySec")) || 0)),
       attentionEvents: Math.max(0, Math.round(Number(formData.get("attentionEvents")) || 0)),
+      // Extended behavioural proctoring signals + timeline (also reviewer aids).
+      proctorTabHiddenSec: intField(formData, "proctorTabHiddenSec"),
+      proctorTabSwitches: intField(formData, "proctorTabSwitches"),
+      proctorPastes: intField(formData, "proctorPastes"),
+      proctorCopies: intField(formData, "proctorCopies"),
+      proctorFullscreenExits: intField(formData, "proctorFullscreenExits"),
+      proctorMultiFace: intField(formData, "proctorMultiFace"),
+      proctorLog: sanitizeLog(formData.get("proctorLog")),
     },
   });
 
@@ -150,14 +200,21 @@ export async function submitAssessment(
     where: { id: assessment.applicationId },
     select: { jobId: true, candidate: { select: { name: true } } },
   });
-  const flagged = (Math.max(0, Math.round(Number(formData.get("attentionAwaySec")) || 0)) > 0);
+  // Any proctoring signal firing is worth surfacing on the timeline so a
+  // reviewer knows to look — never a verdict, just "check the footage".
+  const flagged =
+    intField(formData, "attentionEvents") > 0 ||
+    intField(formData, "proctorTabSwitches") > 0 ||
+    intField(formData, "proctorPastes") > 0 ||
+    intField(formData, "proctorFullscreenExits") > 0 ||
+    intField(formData, "proctorMultiFace") > 0;
   await logActivity({
     jobId: app?.jobId,
     applicationId: assessment.applicationId,
     actor: "candidate",
     type: "assessment_submitted",
     detail: `${app?.candidate.name ?? "Candidate"} submitted the assessment${
-      flagged ? " — attention flags to review" : ""
+      flagged ? " — proctoring flags to review" : ""
     }`,
   });
 

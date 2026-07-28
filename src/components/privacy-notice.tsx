@@ -40,15 +40,17 @@ export function PrivacyNotice({
           team to confirm you completed the task unaided.
         </p>
         <p>
-          <strong className="text-ink">Attention prompts:</strong> while you work, your
-          browser checks whether you are facing the screen and may show you a reminder to
-          stay focused. This runs on your own device.{" "}
+          <strong className="text-ink">Activity &amp; attention checks:</strong> while you
+          work, your browser records a few things to help our team review fairly: whether
+          you are facing the screen, whether a second face appears, when the test tab or
+          window loses focus, when you leave fullscreen, and when you paste into the page.
+          These all run on your own device and are logged with timestamps.{" "}
           <strong className="text-ink">
-            It never rejects you automatically — it only prompts a member of our team to
-            watch that part of the recording, and a person makes every decision.
+            None of this rejects you automatically — it only prompts a member of our team
+            to watch that part of the recording, and a person makes every decision.
           </strong>{" "}
-          Looking at a second monitor or your keyboard is expected and is not held against
-          you.
+          Looking at a second monitor or your keyboard, or a brief interruption, is
+          expected and is not held against you.
         </p>
         <p>
           <strong className="text-ink">Legal basis:</strong> we rely on your consent for

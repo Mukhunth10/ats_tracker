@@ -40,9 +40,17 @@ export interface AssessmentView {
   consentScreen: boolean;
   consentCamera: boolean;
   consentNoticeVersion: string;
-  /** Attention-monitoring result — a reviewer aid, never a verdict. */
+  /** Proctoring result — all reviewer aids, never a verdict. */
   attentionAwaySec: number;
   attentionEvents: number;
+  proctorTabHiddenSec: number;
+  proctorTabSwitches: number;
+  proctorPastes: number;
+  proctorCopies: number;
+  proctorFullscreenExits: number;
+  proctorMultiFace: number;
+  /** JSON array of {t, type} events for the timeline. */
+  proctorLog: string;
   outputUrl: string;
   candidateNote: string;
   qualityScore: number | null;
@@ -82,6 +90,117 @@ function CopyLink({ token }: { token: string }) {
       >
         {copied ? "Copied" : "Copy"}
       </button>
+    </div>
+  );
+}
+
+/** Human-readable labels + tone for each proctor event type. */
+const EVENT_META: Record<string, { label: string; strong: boolean }> = {
+  tab_hidden: { label: "Left the test tab / window", strong: true },
+  tab_visible: { label: "Returned to the tab", strong: false },
+  paste: { label: "Pasted content into the page", strong: true },
+  copy: { label: "Copied from the page", strong: false },
+  fullscreen_exit: { label: "Left fullscreen", strong: true },
+  look_away: { label: "Looked away (sustained)", strong: true },
+  multi_face: { label: "A second face appeared", strong: true },
+};
+
+function mmss(t: number): string {
+  return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+}
+
+/**
+ * The proctoring summary for a submitted assessment: headline flags plus a
+ * scrubbable timeline the reviewer reads against the recording. Every number is
+ * a "worth a look" prompt, never a pass/fail — leaving fullscreen or glancing
+ * away can be perfectly innocent, so a human decides.
+ */
+function ProctorReview({ assessment }: { assessment: AssessmentView }) {
+  const events = (() => {
+    try {
+      const parsed = JSON.parse(assessment.proctorLog || "[]");
+      return Array.isArray(parsed)
+        ? (parsed as { t: number; type: string }[]).filter((e) => EVENT_META[e?.type])
+        : [];
+    } catch {
+      return [];
+    }
+  })();
+
+  const flags: { label: string; n: number; extra?: string }[] = [
+    {
+      label: "Left the tab/window",
+      n: assessment.proctorTabSwitches,
+      extra:
+        assessment.proctorTabHiddenSec > 0
+          ? `${Math.max(1, Math.round(assessment.proctorTabHiddenSec / 60))} min away`
+          : undefined,
+    },
+    { label: "Looked away", n: assessment.attentionEvents,
+      extra: assessment.attentionAwaySec > 0
+        ? `${Math.max(1, Math.round(assessment.attentionAwaySec / 60))} min total` : undefined },
+    { label: "Second face in frame", n: assessment.proctorMultiFace },
+    { label: "Pasted into the page", n: assessment.proctorPastes },
+    { label: "Left fullscreen", n: assessment.proctorFullscreenExits },
+  ].filter((f) => f.n > 0);
+
+  if (flags.length === 0) {
+    return assessment.videoIsFile ? (
+      <p className="text-xs text-ink-subtle">
+        Proctoring: no tab-switches, pastes, extra faces or sustained look-aways flagged.
+      </p>
+    ) : null;
+  }
+
+  return (
+    <div className="space-y-3 rounded-lg border border-warn-border bg-warn-soft p-3 text-sm">
+      <div className="flex flex-wrap gap-1.5">
+        {flags.map((f) => (
+          <span
+            key={f.label}
+            className="inline-flex items-center gap-1 rounded-md bg-surface px-2 py-0.5 text-xs font-medium text-warn ring-1 ring-warn-border ring-inset"
+          >
+            {f.label}: <span className="tabular">{f.n}</span>
+            {f.extra ? <span className="font-normal text-ink-subtle">· {f.extra}</span> : null}
+          </span>
+        ))}
+      </div>
+
+      {events.length > 0 && (
+        <details className="group">
+          <summary className="cursor-pointer text-xs font-medium text-ink-muted hover:text-ink">
+            Timeline — {events.length} event{events.length === 1 ? "" : "s"} (scrub the
+            recording to these times)
+          </summary>
+          <ol className="mt-2 max-h-56 space-y-1 overflow-y-auto pr-1">
+            {events.map((e, i) => {
+              const meta = EVENT_META[e.type];
+              return (
+                <li key={i} className="flex items-center gap-2 text-xs">
+                  <span className="tabular w-11 shrink-0 font-mono text-ink-subtle">
+                    {mmss(Math.max(0, Math.round(e.t)))}
+                  </span>
+                  <span
+                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                      meta.strong ? "bg-warn" : "bg-line-strong"
+                    }`}
+                    aria-hidden
+                  />
+                  <span className={meta.strong ? "text-ink" : "text-ink-muted"}>
+                    {meta.label}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        </details>
+      )}
+
+      <p className="text-xs text-ink-muted">
+        These are prompts to <strong>watch the recording</strong>, not a verdict. A
+        second monitor, a glance at the keyboard, or a brief tab change can be innocent —
+        you decide.
+      </p>
     </div>
   );
 }
@@ -164,29 +283,8 @@ export function AssessmentPanel({
               {assessment.candidateNote}
             </p>
           )}
-          {/* Attention aid — framed so no one mistakes it for an auto-verdict. */}
-          {assessment.attentionEvents > 0 ? (
-            <div className="rounded-lg border border-warn-border bg-warn-soft p-3 text-sm">
-              <p className="font-medium text-warn">
-                Attention flag — looked away {assessment.attentionEvents}{" "}
-                {assessment.attentionEvents === 1 ? "time" : "times"}
-                {assessment.attentionAwaySec > 0
-                  ? `, about ${Math.round(assessment.attentionAwaySec / 60) || 1} min total`
-                  : ""}
-              </p>
-              <p className="mt-1 text-ink-muted">
-                This is a prompt to <strong>watch the recording</strong>, not a verdict.
-                Looking at a second monitor or the keyboard is normal for CAD work. You
-                decide.
-              </p>
-            </div>
-          ) : (
-            assessment.videoIsFile && (
-              <p className="text-xs text-ink-subtle">
-                Attention monitor: no sustained look-aways flagged.
-              </p>
-            )
-          )}
+          {/* Proctoring aids — framed so no one mistakes them for an auto-verdict. */}
+          <ProctorReview assessment={assessment} />
           {assessment.consentAt && (
             <p className="border-t border-line pt-2 text-xs text-ink-subtle">
               Consent recorded {assessment.consentAt} — screen:{" "}

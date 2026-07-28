@@ -158,6 +158,19 @@ model Assessment {
   attentionAwaySec Int @default(0)
   attentionEvents  Int @default(0)
 
+  // Extended proctoring signals — same "reviewer aid, never a verdict" rule.
+  // Behavioural (not biometric): times the test tab lost focus and total seconds
+  // hidden, paste/copy counts, fullscreen exits, and moments more than one face
+  // was visible. proctorLog is a JSON timeline of {t, type} events for the
+  // reviewer to scrub against the recording.
+  proctorTabHiddenSec    Int    @default(0)
+  proctorTabSwitches     Int    @default(0)
+  proctorPastes          Int    @default(0)
+  proctorCopies          Int    @default(0)
+  proctorFullscreenExits Int    @default(0)
+  proctorMultiFace       Int    @default(0)
+  proctorLog             String @default("[]")
+
   // Reviewer's verdict. quality is the primary ranking key; durationMin is the
   // real working time from the recording and breaks ties between close scores.
   qualityScore Int?

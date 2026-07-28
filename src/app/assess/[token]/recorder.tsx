@@ -1,7 +1,20 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { startAttentionMonitor, type AttentionMonitor, type AttentionStats } from "./attention";
+import { startAttentionMonitor, type AttentionMonitor } from "./attention";
+import { startProctor, type ProctorSession, type AssessmentSignals } from "./proctor";
+
+const EMPTY_SIGNALS: AssessmentSignals = {
+  awaySec: 0,
+  events: 0,
+  tabHiddenSec: 0,
+  tabSwitches: 0,
+  pastes: 0,
+  copies: 0,
+  fullscreenExits: 0,
+  multiFace: 0,
+  timeline: [],
+};
 
 type Phase = "idle" | "recording" | "uploading" | "done" | "error";
 
@@ -28,7 +41,7 @@ export function Recorder({
   onUploaded,
 }: {
   token: string;
-  onUploaded: (ref: string, attention: AttentionStats) => void;
+  onUploaded: (ref: string, signals: AssessmentSignals) => void;
 }) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState("");
@@ -44,7 +57,8 @@ export function Recorder({
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const previewRef = useRef<HTMLVideoElement | null>(null);
   const attentionRef = useRef<AttentionMonitor | null>(null);
-  const statsRef = useRef<AttentionStats>({ awaySec: 0, events: 0 });
+  const proctorRef = useRef<ProctorSession | null>(null);
+  const statsRef = useRef<AssessmentSignals>(EMPTY_SIGNALS);
   // Mirror of phase for async closures that would otherwise see a stale value.
   const phaseRef = useRef<Phase>("idle");
   const setPhaseBoth = (p: Phase) => {
@@ -103,10 +117,23 @@ export function Recorder({
     camVideo.muted = true;
     await camVideo.play();
 
+    // Behavioural proctoring (tab focus, paste, fullscreen) starts immediately.
+    statsRef.current = EMPTY_SIGNALS;
+    const proctor = startProctor();
+    proctorRef.current = proctor;
+
+    // Ask for fullscreen so leaving it (to open another app) is a recordable
+    // signal. Best-effort — declining it doesn't block the test.
+    document.documentElement.requestFullscreen?.().catch(() => {});
+
     // Attention monitoring runs on the camera feed. Best-effort: if it can't
-    // start, recording continues without it.
-    statsRef.current = { awaySec: 0, events: 0 };
-    startAttentionMonitor(camVideo, (active) => setWarn(active))
+    // start, recording continues without it. Its look-away / multi-face moments
+    // are fed into the proctor timeline.
+    startAttentionMonitor(
+      camVideo,
+      (active) => setWarn(active),
+      (type) => proctorRef.current?.mark(type),
+    )
       .then((m) => {
         // If the user already stopped before the model finished loading, close it.
         if (phaseRef.current !== "recording") m.stop();
@@ -165,11 +192,29 @@ export function Recorder({
   function stop() {
     if (timerRef.current) clearInterval(timerRef.current);
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    // Capture attention stats before tearing the camera down.
-    if (attentionRef.current) {
-      statsRef.current = attentionRef.current.stop();
-      attentionRef.current = null;
-    }
+    // Capture attention + proctoring stats before tearing the camera down.
+    const attention = attentionRef.current
+      ? attentionRef.current.stop()
+      : { awaySec: 0, events: 0, multiFaceEvents: 0 };
+    attentionRef.current = null;
+    const proctor = proctorRef.current?.stop() ?? {
+      tabHiddenSec: 0,
+      tabSwitches: 0,
+      pastes: 0,
+      copies: 0,
+      fullscreenExits: 0,
+      multiFace: 0,
+      timeline: [],
+    };
+    proctorRef.current = null;
+    statsRef.current = {
+      awaySec: attention.awaySec,
+      events: attention.events,
+      ...proctor,
+    };
+
+    // Leave fullscreen we may have requested, so the "done" screen isn't stuck.
+    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
     if (recorderRef.current && recorderRef.current.state !== "inactive") {
       recorderRef.current.stop();
     }
